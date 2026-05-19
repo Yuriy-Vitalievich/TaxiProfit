@@ -4,6 +4,7 @@ const MONTH_GOAL = 70000;
 const SUPABASE_URL = "https://aqogfuzhjqbsanaovcox.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HHwwAnF8AfI0IW1CdlROtg_sOjD-Wl_";
 const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
+const GOOGLE_SHEETS_WEB_APP_URL = "";
 
 const seedShifts = [
   { date: "2026-05-01", weekday: "пт", start: "17:00", end: "22:15", hours: 5, ordersBolt: 0, ordersUklon: 9, ordersCash: 0, grossBolt: 0, grossUklon: 1688.62, grossCash: 0, gross: 1688.62, rent: 0, fuel: 0, other: 0, netValue: 1688.62, km: 57.4, comment: "7 050,10" },
@@ -167,6 +168,10 @@ function hasCloudStorage() {
   return Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY && window.fetch);
 }
 
+function hasSheetsSync() {
+  return Boolean(GOOGLE_SHEETS_WEB_APP_URL && window.fetch);
+}
+
 async function cloudRequest(path, options = {}) {
   const { method = "GET", body, query = "", prefer = "return=representation" } = options;
   const response = await fetch(`${SUPABASE_REST_URL}/${path}${query}`, {
@@ -187,6 +192,26 @@ async function cloudRequest(path, options = {}) {
 
   if (response.status === 204) return null;
   return response.json();
+}
+
+async function sendToGoogleSheet(type, payload) {
+  if (!hasSheetsSync()) return;
+
+  try {
+    await fetch(GOOGLE_SHEETS_WEB_APP_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8",
+      },
+      body: JSON.stringify({
+        type,
+        payload: stripRemoteId(payload),
+      }),
+    });
+  } catch (error) {
+    console.warn("Google Sheets sync unavailable.", error);
+  }
 }
 
 function stripRemoteId(item) {
@@ -1208,6 +1233,7 @@ elements.shiftForm.addEventListener("submit", async (event) => {
   } else {
     nextShift = await saveShiftToCloud(nextShift);
     shifts.push(nextShift);
+    await sendToGoogleSheet("shift", nextShift);
   }
 
   saveShifts();
@@ -1263,6 +1289,7 @@ elements.expenseForm.addEventListener("submit", async (event) => {
   } else {
     nextExpense = await saveExpenseToCloud(nextExpense);
     expenses.push(nextExpense);
+    await sendToGoogleSheet("expense", nextExpense);
   }
 
   saveExpenses();
