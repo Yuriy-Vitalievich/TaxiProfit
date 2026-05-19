@@ -121,32 +121,23 @@ a {
   min-width: 0;
 }
 
-.period-switch {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 3px;
-  width: min(420px, 54vw);
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.055);
-}
-
-.day-picker {
+.range-picker {
   display: none;
 }
 
-.day-picker.active {
-  display: block;
+.range-picker.active {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
-.day-picker input {
-  width: 148px;
+.period-select select,
+.range-picker input {
   min-height: 38px;
-  border: 1px solid rgba(40, 242, 156, 0.24);
+  border: 1px solid var(--line);
   border-radius: 13px;
-  padding: 0 10px;
-  background: rgba(40, 242, 156, 0.09);
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.07);
   color: var(--text);
   font: inherit;
   font-size: 0.82rem;
@@ -154,12 +145,28 @@ a {
   outline: none;
 }
 
-.day-picker input:focus {
+.period-select select {
+  width: min(230px, 28vw);
+  appearance: auto;
+}
+
+.range-picker input {
+  width: 142px;
+  border: 1px solid rgba(40, 242, 156, 0.24);
+  background: rgba(40, 242, 156, 0.09);
+}
+
+.range-picker span {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.period-select select:focus,
+.range-picker input:focus {
   border-color: rgba(40, 242, 156, 0.5);
   box-shadow: 0 0 0 4px rgba(40, 242, 156, 0.1);
 }
 
-.period,
 .icon-button,
 .profile-button,
 .ghost-button {
@@ -170,21 +177,6 @@ a {
     background 180ms ease,
     border-color 180ms ease,
     box-shadow 180ms ease;
-}
-
-.period {
-  min-height: 34px;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
-.period.active {
-  background: rgba(40, 242, 156, 0.16);
-  color: var(--profit);
-  box-shadow: inset 0 0 0 1px rgba(40, 242, 156, 0.2);
 }
 
 .icon-button,
@@ -1489,7 +1481,10 @@ h2 {
   }
 
   .top-actions,
-  .period-switch {
+  .period-select,
+  .period-select select,
+  .range-picker.active,
+  .range-picker input {
     width: 100%;
   }
 
@@ -1506,29 +1501,9 @@ h2 {
     border-radius: 12px;
   }
 
-  .period-switch {
-    display: flex;
-    gap: 5px;
-    overflow-x: auto;
-    padding: 4px;
-    border-radius: 13px;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .period-switch::-webkit-scrollbar {
-    display: none;
-  }
-
-  .period {
-    min-width: max-content;
-    flex: 1 0 66px;
-    padding: 0 12px;
-  }
-
-  .day-picker.active,
-  .day-picker input {
-    width: 100%;
+  .range-picker.active {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }
 
   .icon-button,
@@ -1782,12 +1757,6 @@ h2 {
 @media (max-width: 420px) {
   .app-shell {
     padding: 8px;
-  }
-
-  .period {
-    flex-basis: 62px;
-    min-height: 36px;
-    font-size: 0.74rem;
   }
 
   .mega-value {

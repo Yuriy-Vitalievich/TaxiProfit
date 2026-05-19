@@ -61,8 +61,12 @@ const elements = {
   incomeChart: document.querySelector("#incomeChart"),
   heatmap: document.querySelector("#heatmap"),
   periodButtons: document.querySelectorAll("[data-period]"),
+  periodSelect: document.querySelector("#periodSelect"),
   dayPickerWrap: document.querySelector("#dayPickerWrap"),
   dayPicker: document.querySelector("#dayPicker"),
+  rangePickerWrap: document.querySelector("#rangePickerWrap"),
+  rangeStart: document.querySelector("#rangeStart"),
+  rangeEnd: document.querySelector("#rangeEnd"),
   viewButtons: document.querySelectorAll("[data-view]"),
   viewPanels: document.querySelectorAll("[data-view-panel]"),
   netProfit: document.querySelector("#netProfit"),
@@ -131,6 +135,8 @@ let activePeriod = "all";
 let shifts = loadShifts();
 let expenses = loadExpenses();
 let selectedDay = latestDataDate();
+let customRangeStart = "";
+let customRangeEnd = "";
 let editingShiftIndex = -1;
 let editingExpenseIndex = -1;
 let hoursEditedManually = false;
@@ -333,7 +339,7 @@ async function loadCloudData({ applyEmpty = false, silent = false } = {}) {
       shifts = cloudShifts;
       expenses = cloudExpenses;
       selectedDay = latestDataDate();
-      elements.dayPicker.value = selectedDay;
+      if (elements.dayPicker) elements.dayPicker.value = selectedDay;
       saveShifts();
       saveExpenses();
       renderAll();
@@ -668,35 +674,99 @@ function todayValue() {
   return today;
 }
 
+function dayBounds(value) {
+  const start = new Date(`${value}T00:00:00`);
+  const end = new Date(`${value}T23:59:59.999`);
+  return { start, end };
+}
+
+function monthStart(value) {
+  const start = new Date(value);
+  start.setDate(1);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function yearStart(value) {
+  const start = new Date(value);
+  start.setMonth(0, 1);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function weekStart(value) {
+  const start = new Date(value);
+  const mondayOffset = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - mondayOffset);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function endOfDay(value) {
+  const end = new Date(value);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
 function periodBounds(period) {
   const end = todayValue();
   const start = new Date(end);
 
   if (period === "day") {
     const selected = selectedDay || latestDataDate();
-    const dayStart = new Date(`${selected}T00:00:00`);
-    const dayEnd = new Date(`${selected}T23:59:59.999`);
-    return { start: dayStart, end: dayEnd };
+    return dayBounds(selected);
   }
 
   if (period === "today") {
-    start.setHours(0, 0, 0, 0);
+    return dayBounds(dateKey(new Date()));
+  }
+
+  if (period === "yesterday") {
+    return dayBounds(dateKey(addDays(new Date(), -1)));
   }
 
   if (period === "week") {
-    const mondayOffset = (end.getDay() + 6) % 7;
-    start.setDate(end.getDate() - mondayOffset);
-    start.setHours(0, 0, 0, 0);
+    return { start: weekStart(end), end };
+  }
+
+  if (period === "prevWeek") {
+    const currentWeekStart = weekStart(end);
+    const prevWeekStart = addDays(currentWeekStart, -7);
+    return { start: prevWeekStart, end: endOfDay(addDays(currentWeekStart, -1)) };
   }
 
   if (period === "month") {
-    start.setDate(1);
-    start.setHours(0, 0, 0, 0);
+    return { start: monthStart(end), end };
+  }
+
+  if (period === "prevMonth") {
+    const currentMonthStart = monthStart(end);
+    const prevMonthStart = new Date(currentMonthStart);
+    prevMonthStart.setMonth(prevMonthStart.getMonth() - 1);
+    return { start: prevMonthStart, end: endOfDay(addDays(currentMonthStart, -1)) };
   }
 
   if (period === "year") {
-    start.setMonth(0, 1);
-    start.setHours(0, 0, 0, 0);
+    return { start: yearStart(end), end };
+  }
+
+  if (period === "prevYear") {
+    const currentYearStart = yearStart(end);
+    const prevYearStart = new Date(currentYearStart);
+    prevYearStart.setFullYear(prevYearStart.getFullYear() - 1);
+    return { start: prevYearStart, end: endOfDay(addDays(currentYearStart, -1)) };
+  }
+
+  if (period === "custom") {
+    const fallback = latestDataDate();
+    const from = customRangeStart || fallback;
+    const to = customRangeEnd || from;
+    const startDate = from <= to ? from : to;
+    const endDate = from <= to ? to : from;
+    return {
+      start: new Date(`${startDate}T00:00:00`),
+      end: new Date(`${endDate}T23:59:59.999`),
+    };
   }
 
   return { start, end };
@@ -1407,18 +1477,35 @@ elements.periodButtons.forEach((button) => {
   button.addEventListener("click", () => {
     activePeriod = button.dataset.period;
     elements.periodButtons.forEach((item) => item.classList.toggle("active", item === button));
-    updateDayPickerVisibility();
+    updatePeriodControls();
     renderAll();
   });
 });
 
-elements.dayPicker.addEventListener("change", () => {
+elements.periodSelect?.addEventListener("change", () => {
+  activePeriod = elements.periodSelect.value;
+  updatePeriodControls();
+  renderAll();
+});
+
+elements.dayPicker?.addEventListener("change", () => {
   selectedDay = elements.dayPicker.value || latestDataDate();
-  if (activePeriod !== "day") {
-    activePeriod = "day";
-    elements.periodButtons.forEach((item) => item.classList.toggle("active", item.dataset.period === "day"));
-    updateDayPickerVisibility();
-  }
+  activePeriod = "day";
+  updatePeriodControls();
+  renderAll();
+});
+
+elements.rangeStart?.addEventListener("change", () => {
+  customRangeStart = elements.rangeStart.value;
+  activePeriod = "custom";
+  updatePeriodControls();
+  renderAll();
+});
+
+elements.rangeEnd?.addEventListener("change", () => {
+  customRangeEnd = elements.rangeEnd.value;
+  activePeriod = "custom";
+  updatePeriodControls();
   renderAll();
 });
 
@@ -1434,8 +1521,25 @@ function setView(view) {
   elements.viewPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.viewPanel === nextView));
 }
 
+function updatePeriodControls() {
+  if (elements.periodSelect) elements.periodSelect.value = activePeriod;
+  elements.periodButtons.forEach((item) => item.classList.toggle("active", item.dataset.period === activePeriod));
+  elements.dayPickerWrap?.classList.toggle("active", activePeriod === "day");
+  elements.rangePickerWrap?.classList.toggle("active", activePeriod === "custom");
+
+  if (elements.dayPicker) elements.dayPicker.value = selectedDay;
+  if (elements.rangeStart && !elements.rangeStart.value) {
+    elements.rangeStart.value = customRangeStart || latestDataDate();
+    customRangeStart = elements.rangeStart.value;
+  }
+  if (elements.rangeEnd && !elements.rangeEnd.value) {
+    elements.rangeEnd.value = customRangeEnd || latestDataDate();
+    customRangeEnd = elements.rangeEnd.value;
+  }
+}
+
 function updateDayPickerVisibility() {
-  elements.dayPickerWrap.classList.toggle("active", activePeriod === "day");
+  updatePeriodControls();
 }
 
 window.addEventListener("hashchange", () => {
@@ -1460,7 +1564,7 @@ elements.shiftForm.addEventListener("submit", async (event) => {
   saveShifts();
   resetShiftForm();
   selectedDay = latestDataDate();
-  elements.dayPicker.value = selectedDay;
+  if (elements.dayPicker) elements.dayPicker.value = selectedDay;
   renderAll();
 });
 
@@ -1474,7 +1578,7 @@ elements.csvImport.addEventListener("change", async (event) => {
     shifts = imported;
     await replaceCloudTable("shifts", shifts);
     selectedDay = latestDataDate();
-    elements.dayPicker.value = selectedDay;
+    if (elements.dayPicker) elements.dayPicker.value = selectedDay;
     saveShifts();
     saveCsvSyncMeta("shifts", imported.length);
     renderAll();
@@ -1571,7 +1675,7 @@ elements.rawShiftList.addEventListener("click", async (event) => {
   if (editingShiftIndex === deleteIndex) resetShiftForm();
   if (editingShiftIndex > deleteIndex) editingShiftIndex -= 1;
   selectedDay = latestDataDate();
-  elements.dayPicker.value = selectedDay;
+  if (elements.dayPicker) elements.dayPicker.value = selectedDay;
   saveShifts();
   renderAll();
 });
@@ -1609,8 +1713,8 @@ elements.cancelExpenseEdit.addEventListener("click", () => {
 elements.clearData.addEventListener("click", async () => {
   shifts = [];
   expenses = [];
-  selectedDay = new Date().toISOString().slice(0, 10);
-  elements.dayPicker.value = selectedDay;
+  selectedDay = dateKey(new Date());
+  if (elements.dayPicker) elements.dayPicker.value = selectedDay;
   resetShiftForm();
   resetExpenseForm();
   await Promise.all([replaceCloudTable("shifts", shifts), replaceCloudTable("expenses", expenses)]);
@@ -1623,7 +1727,7 @@ elements.loadDemo.addEventListener("click", async () => {
   shifts = [...seedShifts];
   expenses = [...seedExpenses];
   selectedDay = latestDataDate();
-  elements.dayPicker.value = selectedDay;
+  if (elements.dayPicker) elements.dayPicker.value = selectedDay;
   resetShiftForm();
   resetExpenseForm();
   await Promise.all([replaceCloudTable("shifts", shifts), replaceCloudTable("expenses", expenses)]);
@@ -1634,7 +1738,7 @@ elements.loadDemo.addEventListener("click", async () => {
 
 resetShiftForm();
 resetExpenseForm();
-elements.dayPicker.value = selectedDay;
+if (elements.dayPicker) elements.dayPicker.value = selectedDay;
 updateDayPickerVisibility();
 setView(location.hash.replace("#", ""));
 renderCsvSyncStatus();

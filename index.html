@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TaxiProfit</title>
-    <link rel="stylesheet" href="styles.css?v=hours-1" />
+    <link rel="stylesheet" href="styles.css?v=periods-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -18,15 +18,24 @@
         </a>
 
         <div class="top-actions">
-          <div class="period-switch" role="group" aria-label="Период">
-            <button class="period active" type="button" data-period="all">Всё</button>
-            <button class="period" type="button" data-period="day">День</button>
-            <button class="period" type="button" data-period="week">Неделя</button>
-            <button class="period" type="button" data-period="month">Месяц</button>
-            <button class="period" type="button" data-period="year">Год</button>
-          </div>
-          <label class="day-picker" id="dayPickerWrap" aria-label="Выбор дня">
-            <input id="dayPicker" type="date" />
+          <label class="period-select" aria-label="Период аналитики">
+            <select id="periodSelect">
+              <option value="all">За все время</option>
+              <option value="today">Сегодня</option>
+              <option value="yesterday">Вчера</option>
+              <option value="week">Эта неделя</option>
+              <option value="prevWeek">Прошлая неделя</option>
+              <option value="month">Этот месяц</option>
+              <option value="prevMonth">Прошлый месяц</option>
+              <option value="year">Этот год</option>
+              <option value="prevYear">Прошлый год</option>
+              <option value="custom">Свой период</option>
+            </select>
+          </label>
+          <label class="range-picker" id="rangePickerWrap" aria-label="Свой период">
+            <input id="rangeStart" type="date" />
+            <span>—</span>
+            <input id="rangeEnd" type="date" />
           </label>
           <button class="icon-button" type="button" aria-label="Настройки">⚙</button>
           <button class="profile-button" type="button" aria-label="Профиль">АК</button>
@@ -397,6 +406,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=ui-kpi-1"></script>
+    <script src="app.js?v=periods-1"></script>
   </body>
 </html>
