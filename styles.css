@@ -1193,6 +1193,44 @@ h2 {
   box-shadow: 0 14px 36px rgba(40, 242, 156, 0.18);
 }
 
+.sync-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(178, 108, 255, 0.28);
+  border-radius: 16px;
+  background: rgba(178, 108, 255, 0.07);
+}
+
+.sync-panel p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.sync-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sync-status {
+  font-size: 0.82rem;
+}
+
+.file-input {
+  position: fixed;
+  left: -100vw;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.raw-list-head {
+  margin-top: 16px;
+}
+
 .raw-list {
   display: grid;
   gap: 10px;
@@ -1586,6 +1624,10 @@ h2 {
 
   .form-actions .ghost-button {
     width: 100%;
+  }
+
+  .sync-actions {
+    grid-template-columns: 1fr;
   }
 
   .data-intro {

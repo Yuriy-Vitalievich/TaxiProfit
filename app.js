@@ -1,5 +1,6 @@
 const STORAGE_KEY = "taxiProfit.shifts.v3";
 const EXPENSE_STORAGE_KEY = "taxiProfit.expenses.v1";
+const CSV_SYNC_STORAGE_KEY = "taxiProfit.csvSync.v1";
 const MONTH_GOAL = 70000;
 const SUPABASE_URL = "https://aqogfuzhjqbsanaovcox.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HHwwAnF8AfI0IW1CdlROtg_sOjD-Wl_";
@@ -105,9 +106,12 @@ const elements = {
   hoursInput: document.querySelector("#shiftForm [name='hours']"),
   rawShiftList: document.querySelector("#rawShiftList"),
   csvImport: document.querySelector("#csvImport"),
+  importShiftsButton: document.querySelector("#importShiftsButton"),
   expenseForm: document.querySelector("#expenseForm"),
   expenseDateInput: document.querySelector("#expenseForm [name='date']"),
   expenseImport: document.querySelector("#expenseImport"),
+  importExpensesButton: document.querySelector("#importExpensesButton"),
+  csvSyncStatus: document.querySelector("#csvSyncStatus"),
   shiftFormKicker: document.querySelector("#shiftFormKicker"),
   shiftFormTitle: document.querySelector("#shiftFormTitle"),
   shiftSubmit: document.querySelector("#shiftSubmit"),
@@ -158,6 +162,49 @@ function loadExpenses() {
 
 function saveExpenses() {
   writeStorage(JSON.stringify(expenses), EXPENSE_STORAGE_KEY);
+}
+
+function loadCsvSyncMeta() {
+  const saved = readStorage(CSV_SYNC_STORAGE_KEY);
+  if (!saved) return {};
+
+  try {
+    return JSON.parse(saved) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCsvSyncMeta(type, count) {
+  const meta = {
+    ...loadCsvSyncMeta(),
+    [type]: {
+      count,
+      importedAt: new Date().toISOString(),
+    },
+  };
+  writeStorage(JSON.stringify(meta), CSV_SYNC_STORAGE_KEY);
+  renderCsvSyncStatus();
+}
+
+function formatImportDate(value) {
+  if (!value) return "";
+  return new Date(value).toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function renderCsvSyncStatus() {
+  if (!elements.csvSyncStatus) return;
+
+  const meta = loadCsvSyncMeta();
+  const parts = [];
+  if (meta.shifts) parts.push(`смены: ${meta.shifts.count} строк · ${formatImportDate(meta.shifts.importedAt)}`);
+  if (meta.expenses) parts.push(`расходы: ${meta.expenses.count} строк · ${formatImportDate(meta.expenses.importedAt)}`);
+  elements.csvSyncStatus.textContent = parts.length ? `Последний импорт — ${parts.join("; ")}` : "Импорт еще не выполнялся.";
 }
 
 function setSyncStatus(message) {
@@ -1255,6 +1302,7 @@ elements.csvImport.addEventListener("change", async (event) => {
     selectedDay = latestDataDate();
     elements.dayPicker.value = selectedDay;
     saveShifts();
+    saveCsvSyncMeta("shifts", imported.length);
     renderAll();
   }
 
@@ -1271,10 +1319,19 @@ elements.expenseImport.addEventListener("change", async (event) => {
     expenses = imported;
     await replaceCloudTable("expenses", expenses);
     saveExpenses();
+    saveCsvSyncMeta("expenses", imported.length);
     renderAll();
   }
 
   event.target.value = "";
+});
+
+elements.importShiftsButton.addEventListener("click", () => {
+  elements.csvImport.click();
+});
+
+elements.importExpensesButton.addEventListener("click", () => {
+  elements.expenseImport.click();
 });
 
 elements.expenseForm.addEventListener("submit", async (event) => {
@@ -1392,5 +1449,6 @@ resetExpenseForm();
 elements.dayPicker.value = selectedDay;
 updateDayPickerVisibility();
 setView(location.hash.replace("#", ""));
+renderCsvSyncStatus();
 renderAll();
 loadCloudData();

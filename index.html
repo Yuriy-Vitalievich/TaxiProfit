@@ -366,25 +366,33 @@
           <section class="panel raw-data-panel">
             <div class="section-head tight">
               <div>
-                <span class="section-kicker">База</span>
-                <h2>Введенные смены</h2>
+                <span class="section-kicker">Синхронизация</span>
+                <h2>Google Sheets CSV</h2>
               </div>
               <button class="ghost-button danger" type="button" id="clearData">Очистить</button>
             </div>
-            <label class="import-box">
-              <span>Импорт из Google Sheets CSV</span>
-              <input id="csvImport" type="file" accept=".csv,text/csv" />
-            </label>
-            <label class="import-box">
-              <span>Импорт листа “Расходы” CSV</span>
-              <input id="expenseImport" type="file" accept=".csv,text/csv" />
-            </label>
+            <div class="sync-panel">
+              <p>Скачай CSV из Google Sheets и загрузи сюда: отдельно лист со сменами и отдельно лист “Расходы”.</p>
+              <div class="sync-actions">
+                <button class="ghost-button" type="button" id="importShiftsButton">Импорт смен</button>
+                <button class="ghost-button" type="button" id="importExpensesButton">Импорт расходов</button>
+              </div>
+              <p class="sync-status" id="csvSyncStatus">Импорт еще не выполнялся.</p>
+            </div>
+            <input class="file-input" id="csvImport" type="file" accept=".csv,text/csv" />
+            <input class="file-input" id="expenseImport" type="file" accept=".csv,text/csv" />
+            <div class="section-head tight raw-list-head">
+              <div>
+                <span class="section-kicker">База</span>
+                <h2>Введенные смены</h2>
+              </div>
+            </div>
             <div class="raw-list" id="rawShiftList"></div>
           </section>
         </section>
       </main>
     </div>
 
-    <script src="app.js?v=sheets-1"></script>
+    <script src="app.js?v=csv-sync-1"></script>
   </body>
 </html>
