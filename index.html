@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TaxiProfit</title>
-    <link rel="stylesheet" href="styles.css?v=mobile-1" />
+    <link rel="stylesheet" href="styles.css?v=edit-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -238,10 +238,13 @@
           <form class="panel shift-form" id="shiftForm">
             <div class="section-head tight">
               <div>
-                <span class="section-kicker">Новая смена</span>
-                <h2>Добавить данные</h2>
+                <span class="section-kicker" id="shiftFormKicker">Новая смена</span>
+                <h2 id="shiftFormTitle">Добавить данные</h2>
               </div>
-              <button class="ghost-button" type="button" id="loadDemo">Демо</button>
+              <div class="form-actions">
+                <button class="ghost-button" type="button" id="cancelShiftEdit" hidden>Отмена</button>
+                <button class="ghost-button" type="button" id="loadDemo">Демо</button>
+              </div>
             </div>
 
             <div class="form-grid">
@@ -311,15 +314,16 @@
               </label>
             </div>
 
-            <button class="submit-button" type="submit">Добавить смену</button>
+            <button class="submit-button" type="submit" id="shiftSubmit">Добавить смену</button>
           </form>
 
           <form class="panel shift-form expense-entry-form" id="expenseForm">
             <div class="section-head tight">
               <div>
-                <span class="section-kicker">Журнал расходов</span>
-                <h2>Добавить расход</h2>
+                <span class="section-kicker" id="expenseFormKicker">Журнал расходов</span>
+                <h2 id="expenseFormTitle">Добавить расход</h2>
               </div>
+              <button class="ghost-button" type="button" id="cancelExpenseEdit" hidden>Отмена</button>
             </div>
 
             <div class="form-grid">
@@ -356,7 +360,7 @@
               </label>
             </div>
 
-            <button class="submit-button" type="submit">Добавить расход</button>
+            <button class="submit-button" type="submit" id="expenseSubmit">Добавить расход</button>
           </form>
 
           <section class="panel raw-data-panel">
@@ -381,6 +385,6 @@
       </main>
     </div>
 
-    <script src="app.js?v=mobile-1"></script>
+    <script src="app.js?v=edit-1"></script>
   </body>
 </html>

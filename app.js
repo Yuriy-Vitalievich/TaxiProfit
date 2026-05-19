@@ -102,6 +102,14 @@ const elements = {
   expenseForm: document.querySelector("#expenseForm"),
   expenseDateInput: document.querySelector("#expenseForm [name='date']"),
   expenseImport: document.querySelector("#expenseImport"),
+  shiftFormKicker: document.querySelector("#shiftFormKicker"),
+  shiftFormTitle: document.querySelector("#shiftFormTitle"),
+  shiftSubmit: document.querySelector("#shiftSubmit"),
+  cancelShiftEdit: document.querySelector("#cancelShiftEdit"),
+  expenseFormKicker: document.querySelector("#expenseFormKicker"),
+  expenseFormTitle: document.querySelector("#expenseFormTitle"),
+  expenseSubmit: document.querySelector("#expenseSubmit"),
+  cancelExpenseEdit: document.querySelector("#cancelExpenseEdit"),
   clearData: document.querySelector("#clearData"),
   loadDemo: document.querySelector("#loadDemo"),
 };
@@ -110,6 +118,8 @@ let activePeriod = "all";
 let shifts = loadShifts();
 let expenses = loadExpenses();
 let selectedDay = latestDataDate();
+let editingShiftIndex = -1;
+let editingExpenseIndex = -1;
 
 function loadShifts() {
   const saved = readStorage();
@@ -236,6 +246,18 @@ function normalizeTime(value) {
 
 function sortedShifts() {
   return [...shifts].sort((a, b) => dateValue(b) - dateValue(a));
+}
+
+function indexedShifts() {
+  return shifts
+    .map((shift, sourceIndex) => ({ shift, sourceIndex }))
+    .sort((a, b) => dateValue(b.shift) - dateValue(a.shift));
+}
+
+function indexedExpenses() {
+  return expenses
+    .map((expense, sourceIndex) => ({ expense, sourceIndex }))
+    .sort((a, b) => new Date(`${b.expense.date}T12:00`) - new Date(`${a.expense.date}T12:00`));
 }
 
 function latestDataDate() {
@@ -665,29 +687,35 @@ function renderShiftTables() {
   elements.shiftTable.querySelectorAll(".table-row:not(.table-head)").forEach((row) => row.remove());
   elements.shiftTable.insertAdjacentHTML("beforeend", rows);
 
-  const shiftCards = sortedShifts()
+  const shiftCards = indexedShifts()
     .map(
-      (shift, index) => `
-        <article class="raw-shift ${isWorkShift(shift) ? "" : "off-shift"}">
+      ({ shift, sourceIndex }) => `
+        <article class="raw-shift ${isWorkShift(shift) ? "" : "off-shift"} ${sourceIndex === editingShiftIndex ? "editing" : ""}">
           <div>
             <strong>${shift.date} · ${isWorkShift(shift) ? `${shift.start || "—"}–${shift.end || "—"}` : "Выходной"}</strong>
             <span>${isWorkShift(shift) ? `${shift.hours} ч · ${totalOrders(shift)} заказов · ${Number(shift.km || 0).toFixed(1)} км · ${money(net(shift))} чистыми` : "нулевой день, в средние за смену не входит"}</span>
           </div>
-          <button type="button" data-delete-index="${index}" aria-label="Удалить смену">×</button>
+          <div class="row-actions">
+            <button class="edit-row" type="button" data-edit-index="${sourceIndex}" aria-label="Редактировать смену">✎</button>
+            <button class="delete-row" type="button" data-delete-index="${sourceIndex}" aria-label="Удалить смену">×</button>
+          </div>
         </article>
       `,
     )
     .join("");
 
-  const expenseCards = sortedExpenses()
+  const expenseCards = indexedExpenses()
     .map(
-      (expense, index) => `
-        <article class="raw-shift expense-row">
+      ({ expense, sourceIndex }) => `
+        <article class="raw-shift expense-row ${sourceIndex === editingExpenseIndex ? "editing" : ""}">
           <div>
             <strong>${expense.date} · ${expense.category}</strong>
             <span>${expense.description || "без описания"} · ${money(expense.amount)} · ${expense.payment || "оплата не указана"}</span>
           </div>
-          <button type="button" data-delete-expense-index="${index}" aria-label="Удалить расход">×</button>
+          <div class="row-actions">
+            <button class="edit-row" type="button" data-edit-expense-index="${sourceIndex}" aria-label="Редактировать расход">✎</button>
+            <button class="delete-row" type="button" data-delete-expense-index="${sourceIndex}" aria-label="Удалить расход">×</button>
+          </div>
         </article>
       `,
     )
@@ -697,7 +725,7 @@ function renderShiftTables() {
 }
 
 function sortedExpenses() {
-  return [...expenses].sort((a, b) => new Date(`${b.date}T12:00`) - new Date(`${a.date}T12:00`));
+  return indexedExpenses().map((item) => item.expense);
 }
 
 function renderAll() {
@@ -709,6 +737,125 @@ function renderAll() {
 
 function readNumber(formData, key) {
   return Number(formData.get(key) || 0);
+}
+
+function shiftFromForm(formData) {
+  return normalizeShift({
+    date: formData.get("date"),
+    start: formData.get("start"),
+    end: formData.get("end"),
+    hours: readNumber(formData, "hours"),
+    ordersBolt: readNumber(formData, "ordersBolt"),
+    ordersUklon: readNumber(formData, "ordersUklon"),
+    ordersCash: readNumber(formData, "ordersCash"),
+    grossBolt: readNumber(formData, "grossBolt"),
+    grossUklon: readNumber(formData, "grossUklon"),
+    grossCash: readNumber(formData, "grossCash"),
+    gross:
+      readNumber(formData, "gross") ||
+      readNumber(formData, "grossBolt") + readNumber(formData, "grossUklon") + readNumber(formData, "grossCash"),
+    fuel: readNumber(formData, "fuel"),
+    rent: readNumber(formData, "rent"),
+    other: readNumber(formData, "other"),
+    km: readNumber(formData, "km"),
+    comment: formData.get("comment"),
+  });
+}
+
+function expenseFromForm(formData) {
+  return normalizeExpense({
+    date: formData.get("date"),
+    category: formData.get("category"),
+    description: formData.get("description"),
+    amount: readNumber(formData, "amount"),
+    payment: formData.get("payment"),
+    comment: formData.get("comment"),
+  });
+}
+
+function setFormValues(form, values) {
+  Object.entries(values).forEach(([key, value]) => {
+    const field = form.elements[key];
+    if (field) field.value = value ?? "";
+  });
+}
+
+function resetShiftForm() {
+  editingShiftIndex = -1;
+  elements.shiftForm.classList.remove("editing");
+  elements.shiftForm.reset();
+  elements.dateInput.value = new Date().toISOString().slice(0, 10);
+  elements.startInput.value = "17:30";
+  elements.endInput.value = "23:30";
+  elements.shiftFormKicker.textContent = "Новая смена";
+  elements.shiftFormTitle.textContent = "Добавить данные";
+  elements.shiftSubmit.textContent = "Добавить смену";
+  elements.cancelShiftEdit.hidden = true;
+}
+
+function resetExpenseForm() {
+  editingExpenseIndex = -1;
+  elements.expenseForm.classList.remove("editing");
+  elements.expenseForm.reset();
+  elements.expenseDateInput.value = new Date().toISOString().slice(0, 10);
+  elements.expenseFormKicker.textContent = "Журнал расходов";
+  elements.expenseFormTitle.textContent = "Добавить расход";
+  elements.expenseSubmit.textContent = "Добавить расход";
+  elements.cancelExpenseEdit.hidden = true;
+}
+
+function editShift(index) {
+  const shift = shifts[index];
+  if (!shift) return;
+
+  editingShiftIndex = index;
+  elements.shiftForm.classList.add("editing");
+  elements.shiftFormKicker.textContent = "Редактирование";
+  elements.shiftFormTitle.textContent = "Изменить смену";
+  elements.shiftSubmit.textContent = "Сохранить смену";
+  elements.cancelShiftEdit.hidden = false;
+  setFormValues(elements.shiftForm, {
+    date: shift.date,
+    start: shift.start || "",
+    end: shift.end || "",
+    hours: shift.hours || "",
+    grossUklon: shift.grossUklon || "",
+    grossBolt: shift.grossBolt || "",
+    grossCash: shift.grossCash || "",
+    gross: shift.gross || "",
+    fuel: shift.fuel || "",
+    rent: shift.rent || "",
+    other: shift.other || "",
+    ordersUklon: shift.ordersUklon || "",
+    ordersBolt: shift.ordersBolt || "",
+    ordersCash: shift.ordersCash || "",
+    km: shift.km || "",
+    comment: shift.comment || "",
+  });
+  elements.shiftForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  renderShiftTables();
+}
+
+function editExpense(index) {
+  const expense = expenses[index];
+  if (!expense) return;
+
+  editingExpenseIndex = index;
+  elements.expenseForm.classList.add("editing");
+  elements.expenseFormKicker.textContent = "Редактирование";
+  elements.expenseFormTitle.textContent = "Изменить расход";
+  elements.expenseSubmit.textContent = "Сохранить расход";
+  elements.cancelExpenseEdit.hidden = false;
+  setFormValues(elements.expenseForm, {
+    date: expense.date,
+    category: expense.category,
+    description: expense.description,
+    amount: expense.amount || "",
+    payment: expense.payment,
+    comment: expense.comment,
+  });
+  elements.expenseForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  renderShiftTables();
 }
 
 function parseLocalNumber(value) {
@@ -851,33 +998,16 @@ window.addEventListener("hashchange", () => {
 elements.shiftForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const formData = new FormData(elements.shiftForm);
+  const nextShift = shiftFromForm(formData);
 
-  shifts.push({
-    date: formData.get("date"),
-    start: formData.get("start"),
-    end: formData.get("end"),
-    hours: readNumber(formData, "hours"),
-    ordersBolt: readNumber(formData, "ordersBolt"),
-    ordersUklon: readNumber(formData, "ordersUklon"),
-    ordersCash: readNumber(formData, "ordersCash"),
-    grossBolt: readNumber(formData, "grossBolt"),
-    grossUklon: readNumber(formData, "grossUklon"),
-    grossCash: readNumber(formData, "grossCash"),
-    gross:
-      readNumber(formData, "gross") ||
-      readNumber(formData, "grossBolt") + readNumber(formData, "grossUklon") + readNumber(formData, "grossCash"),
-    fuel: readNumber(formData, "fuel"),
-    rent: readNumber(formData, "rent"),
-    other: readNumber(formData, "other"),
-    km: readNumber(formData, "km"),
-    comment: formData.get("comment"),
-  });
+  if (editingShiftIndex >= 0) {
+    shifts[editingShiftIndex] = nextShift;
+  } else {
+    shifts.push(nextShift);
+  }
 
   saveShifts();
-  elements.shiftForm.reset();
-  elements.dateInput.value = new Date().toISOString().slice(0, 10);
-  elements.startInput.value = "17:30";
-  elements.endInput.value = "23:30";
+  resetShiftForm();
   selectedDay = latestDataDate();
   elements.dayPicker.value = selectedDay;
   renderAll();
@@ -889,6 +1019,7 @@ elements.csvImport.addEventListener("change", async (event) => {
 
   const imported = shiftsFromCSV(await file.text());
   if (imported.length) {
+    resetShiftForm();
     shifts = imported;
     selectedDay = latestDataDate();
     elements.dayPicker.value = selectedDay;
@@ -905,6 +1036,7 @@ elements.expenseImport.addEventListener("change", async (event) => {
 
   const imported = expensesFromCSV(await file.text());
   if (imported.length) {
+    resetExpenseForm();
     expenses = imported;
     saveExpenses();
     renderAll();
@@ -916,31 +1048,34 @@ elements.expenseImport.addEventListener("change", async (event) => {
 elements.expenseForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const formData = new FormData(elements.expenseForm);
+  const nextExpense = expenseFromForm(formData);
 
-  expenses.push(
-    normalizeExpense({
-      date: formData.get("date"),
-      category: formData.get("category"),
-      description: formData.get("description"),
-      amount: readNumber(formData, "amount"),
-      payment: formData.get("payment"),
-      comment: formData.get("comment"),
-    }),
-  );
+  if (editingExpenseIndex >= 0) {
+    expenses[editingExpenseIndex] = nextExpense;
+  } else {
+    expenses.push(nextExpense);
+  }
 
   saveExpenses();
-  elements.expenseForm.reset();
-  elements.expenseDateInput.value = new Date().toISOString().slice(0, 10);
+  resetExpenseForm();
   renderAll();
+});
+
+elements.rawShiftList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-edit-index]");
+  if (!button) return;
+
+  editShift(Number(button.dataset.editIndex));
 });
 
 elements.rawShiftList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-delete-index]");
   if (!button) return;
 
-  const ordered = sortedShifts();
-  const shiftToDelete = ordered[Number(button.dataset.deleteIndex)];
-  shifts = shifts.filter((shift) => shift !== shiftToDelete);
+  const deleteIndex = Number(button.dataset.deleteIndex);
+  shifts.splice(deleteIndex, 1);
+  if (editingShiftIndex === deleteIndex) resetShiftForm();
+  if (editingShiftIndex > deleteIndex) editingShiftIndex -= 1;
   selectedDay = latestDataDate();
   elements.dayPicker.value = selectedDay;
   saveShifts();
@@ -948,14 +1083,32 @@ elements.rawShiftList.addEventListener("click", (event) => {
 });
 
 elements.rawShiftList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-edit-expense-index]");
+  if (!button) return;
+
+  editExpense(Number(button.dataset.editExpenseIndex));
+});
+
+elements.rawShiftList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-delete-expense-index]");
   if (!button) return;
 
-  const ordered = sortedExpenses();
-  const expenseToDelete = ordered[Number(button.dataset.deleteExpenseIndex)];
-  expenses = expenses.filter((expense) => expense !== expenseToDelete);
+  const deleteIndex = Number(button.dataset.deleteExpenseIndex);
+  expenses.splice(deleteIndex, 1);
+  if (editingExpenseIndex === deleteIndex) resetExpenseForm();
+  if (editingExpenseIndex > deleteIndex) editingExpenseIndex -= 1;
   saveExpenses();
   renderAll();
+});
+
+elements.cancelShiftEdit.addEventListener("click", () => {
+  resetShiftForm();
+  renderShiftTables();
+});
+
+elements.cancelExpenseEdit.addEventListener("click", () => {
+  resetExpenseForm();
+  renderShiftTables();
 });
 
 elements.clearData.addEventListener("click", () => {
@@ -963,6 +1116,8 @@ elements.clearData.addEventListener("click", () => {
   expenses = [];
   selectedDay = new Date().toISOString().slice(0, 10);
   elements.dayPicker.value = selectedDay;
+  resetShiftForm();
+  resetExpenseForm();
   saveShifts();
   saveExpenses();
   renderAll();
@@ -973,13 +1128,15 @@ elements.loadDemo.addEventListener("click", () => {
   expenses = [...seedExpenses];
   selectedDay = latestDataDate();
   elements.dayPicker.value = selectedDay;
+  resetShiftForm();
+  resetExpenseForm();
   saveShifts();
   saveExpenses();
   renderAll();
 });
 
-elements.dateInput.value = new Date().toISOString().slice(0, 10);
-elements.expenseDateInput.value = new Date().toISOString().slice(0, 10);
+resetShiftForm();
+resetExpenseForm();
 elements.dayPicker.value = selectedDay;
 updateDayPickerVisibility();
 setView(location.hash.replace("#", ""));

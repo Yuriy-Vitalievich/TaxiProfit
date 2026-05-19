@@ -1123,6 +1123,24 @@ h2 {
   gap: 12px;
 }
 
+.form-actions,
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-actions {
+  justify-content: flex-end;
+}
+
+.shift-form.editing {
+  border-color: rgba(40, 242, 156, 0.38);
+  box-shadow:
+    var(--shadow),
+    inset 0 0 0 1px rgba(40, 242, 156, 0.12);
+}
+
 .form-grid label,
 .import-box {
   display: grid;
@@ -1216,24 +1234,50 @@ h2 {
   font-size: 0.84rem;
 }
 
-.raw-shift button {
+.row-actions {
+  flex: 0 0 auto;
+}
+
+.row-actions button {
   display: grid;
   place-items: center;
   width: 34px;
   height: 34px;
   flex: 0 0 34px;
-  border: 1px solid rgba(255, 95, 122, 0.22);
+  border: 1px solid var(--line);
   border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.row-actions .edit-row {
+  border-color: rgba(40, 242, 156, 0.24);
+  background: rgba(40, 242, 156, 0.1);
+  color: var(--profit);
+}
+
+.row-actions .delete-row {
+  border-color: rgba(255, 95, 122, 0.22);
   background: rgba(255, 95, 122, 0.1);
   color: var(--loss);
-  cursor: pointer;
   font-size: 1.25rem;
-  line-height: 1;
+}
+
+.raw-shift.editing {
+  border-color: rgba(40, 242, 156, 0.42);
+  background: rgba(40, 242, 156, 0.08);
 }
 
 .raw-shift.expense-row {
   border-color: rgba(255, 95, 122, 0.18);
   background: rgba(255, 95, 122, 0.055);
+}
+
+.raw-shift.expense-row.editing {
+  border-color: rgba(40, 242, 156, 0.42);
+  background: rgba(40, 242, 156, 0.08);
 }
 
 .ghost-button.danger {
@@ -1535,6 +1579,15 @@ h2 {
     width: 100%;
   }
 
+  .form-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .form-actions .ghost-button {
+    width: 100%;
+  }
+
   .data-intro {
     align-items: stretch;
   }
@@ -1562,6 +1615,10 @@ h2 {
   .raw-shift {
     align-items: stretch;
     padding: 12px;
+  }
+
+  .row-actions {
+    align-self: flex-start;
   }
 
   .raw-shift > div {
