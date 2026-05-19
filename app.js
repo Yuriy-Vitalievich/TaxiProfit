@@ -6,6 +6,7 @@ const SUPABASE_URL = "https://aqogfuzhjqbsanaovcox.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HHwwAnF8AfI0IW1CdlROtg_sOjD-Wl_";
 const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
 const GOOGLE_SHEETS_WEB_APP_URL = "";
+const REALTIME_REFRESH_DELAY = 500;
 
 const seedShifts = [
   { date: "2026-05-01", weekday: "пт", start: "17:00", end: "22:15", hours: 5, ordersBolt: 0, ordersUklon: 9, ordersCash: 0, grossBolt: 0, grossUklon: 1688.62, grossCash: 0, gross: 1688.62, rent: 0, fuel: 0, other: 0, netValue: 1688.62, km: 57.4, comment: "7 050,10" },
@@ -131,6 +132,9 @@ let selectedDay = latestDataDate();
 let editingShiftIndex = -1;
 let editingExpenseIndex = -1;
 let hoursEditedManually = false;
+let realtimeClient = null;
+let realtimeReloadTimer = null;
+let cloudLoadedOnce = false;
 
 function loadShifts() {
   const saved = readStorage();
@@ -215,6 +219,10 @@ function hasCloudStorage() {
   return Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY && window.fetch);
 }
 
+function hasRealtimeClient() {
+  return Boolean(hasCloudStorage() && window.supabase?.createClient);
+}
+
 function hasSheetsSync() {
   return Boolean(GOOGLE_SHEETS_WEB_APP_URL && window.fetch);
 }
@@ -274,10 +282,10 @@ function normalizeCloudExpense(row) {
   return normalizeExpense({ ...(row.payload || {}), remoteId: row.id });
 }
 
-async function loadCloudData() {
+async function loadCloudData({ applyEmpty = false, silent = false } = {}) {
   if (!hasCloudStorage()) {
     setSyncStatus("Облако недоступно, работаем с локальной копией.");
-    return;
+    return false;
   }
 
   try {
@@ -288,8 +296,9 @@ async function loadCloudData() {
 
     const cloudShifts = (shiftResult || []).map(normalizeCloudShift);
     const cloudExpenses = (expenseResult || []).map(normalizeCloudExpense);
+    const hasCloudRows = cloudShifts.length || cloudExpenses.length;
 
-    if (cloudShifts.length || cloudExpenses.length) {
+    if (hasCloudRows || applyEmpty || cloudLoadedOnce) {
       shifts = cloudShifts;
       expenses = cloudExpenses;
       selectedDay = latestDataDate();
@@ -298,15 +307,64 @@ async function loadCloudData() {
       saveExpenses();
       renderAll();
     }
+    cloudLoadedOnce = true;
+
+    if (silent) return;
     setSyncStatus(
-      cloudShifts.length || cloudExpenses.length
-        ? "Данные загружены из Supabase, localStorage остается резервной копией."
+      hasCloudRows
+        ? "Данные загружены из Supabase. Realtime подключается..."
         : "Supabase подключен, но облачная база пока пустая.",
     );
+    return true;
   } catch (error) {
     setSyncStatus("Supabase ждет настройки таблиц. Выполни supabase-schema.sql.");
     console.warn("Supabase sync unavailable, using local data.", error);
+    return false;
   }
+}
+
+function scheduleCloudReload(message = "Данные обновлены на другом устройстве.") {
+  window.clearTimeout(realtimeReloadTimer);
+  realtimeReloadTimer = window.setTimeout(async () => {
+    setSyncStatus(`${message} Обновляю экран...`);
+    await loadCloudData({ applyEmpty: true, silent: true });
+    setSyncStatus("Realtime включен: данные синхронизируются между устройствами.");
+  }, REALTIME_REFRESH_DELAY);
+}
+
+function setupRealtimeSync() {
+  if (!hasRealtimeClient()) {
+    setSyncStatus("Supabase работает через REST. Для realtime нужен supabase-js CDN.");
+    return;
+  }
+
+  realtimeClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+
+  realtimeClient
+    .channel("taxiprofit-live")
+    .on("postgres_changes", { event: "*", schema: "public", table: "shifts" }, () => {
+      scheduleCloudReload("Смены обновлены в облаке.");
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "expenses" }, () => {
+      scheduleCloudReload("Расходы обновлены в облаке.");
+    })
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        setSyncStatus("Realtime включен: данные синхронизируются между устройствами.");
+      }
+      if (status === "CHANNEL_ERROR") {
+        setSyncStatus("Realtime ждет настройки Supabase. Проверь supabase-schema.sql.");
+      }
+      if (status === "CLOSED") {
+        setSyncStatus("Realtime отключен. Изменения сохраняются, но обновятся после перезагрузки.");
+      }
+    });
 }
 
 async function saveShiftToCloud(shift) {
@@ -1451,4 +1509,6 @@ updateDayPickerVisibility();
 setView(location.hash.replace("#", ""));
 renderCsvSyncStatus();
 renderAll();
-loadCloudData();
+loadCloudData().then((isCloudReady) => {
+  if (isCloudReady) setupRealtimeSync();
+});

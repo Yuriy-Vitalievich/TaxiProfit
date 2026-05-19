@@ -14,6 +14,9 @@ create table if not exists public.expenses (
   updated_at timestamptz not null default now()
 );
 
+alter table public.shifts replica identity full;
+alter table public.expenses replica identity full;
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -88,3 +91,29 @@ create policy "Public delete expenses"
 on public.expenses for delete
 to anon
 using (true);
+
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    if not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = 'shifts'
+    ) then
+      alter publication supabase_realtime add table public.shifts;
+    end if;
+
+    if not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = 'expenses'
+    ) then
+      alter publication supabase_realtime add table public.expenses;
+    end if;
+  end if;
+end
+$$;
