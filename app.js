@@ -1,6 +1,9 @@
 const STORAGE_KEY = "taxiProfit.shifts.v3";
 const EXPENSE_STORAGE_KEY = "taxiProfit.expenses.v1";
 const MONTH_GOAL = 70000;
+const SUPABASE_URL = "https://aqogfuzhjqbsanaovcox.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HHwwAnF8AfI0IW1CdlROtg_sOjD-Wl_";
+const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
 
 const seedShifts = [
   { date: "2026-05-01", weekday: "пт", start: "17:00", end: "22:15", hours: 5, ordersBolt: 0, ordersUklon: 9, ordersCash: 0, grossBolt: 0, grossUklon: 1688.62, grossCash: 0, gross: 1688.62, rent: 0, fuel: 0, other: 0, netValue: 1688.62, km: 57.4, comment: "7 050,10" },
@@ -87,6 +90,7 @@ const elements = {
   fineExpense: document.querySelector("#fineExpense"),
   repairExpense: document.querySelector("#repairExpense"),
   otherExpense: document.querySelector("#otherExpense"),
+  syncStatus: document.querySelector("#syncStatus"),
   goalPercent: document.querySelector("#goalPercent"),
   goalProgress: document.querySelector("#goalProgress"),
   goalText: document.querySelector("#goalText"),
@@ -153,6 +157,167 @@ function loadExpenses() {
 
 function saveExpenses() {
   writeStorage(JSON.stringify(expenses), EXPENSE_STORAGE_KEY);
+}
+
+function setSyncStatus(message) {
+  if (elements.syncStatus) elements.syncStatus.textContent = message;
+}
+
+function hasCloudStorage() {
+  return Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY && window.fetch);
+}
+
+async function cloudRequest(path, options = {}) {
+  const { method = "GET", body, query = "", prefer = "return=representation" } = options;
+  const response = await fetch(`${SUPABASE_REST_URL}/${path}${query}`, {
+    method,
+    headers: {
+      apikey: SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: prefer,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Supabase request failed: ${response.status}`);
+  }
+
+  if (response.status === 204) return null;
+  return response.json();
+}
+
+function stripRemoteId(item) {
+  const { remoteId, ...payload } = item;
+  return payload;
+}
+
+function normalizeCloudShift(row) {
+  return normalizeShift({ ...(row.payload || {}), remoteId: row.id });
+}
+
+function normalizeCloudExpense(row) {
+  return normalizeExpense({ ...(row.payload || {}), remoteId: row.id });
+}
+
+async function loadCloudData() {
+  if (!hasCloudStorage()) {
+    setSyncStatus("Облако недоступно, работаем с локальной копией.");
+    return;
+  }
+
+  try {
+    const [shiftResult, expenseResult] = await Promise.all([
+      cloudRequest("shifts", { query: "?select=id,payload&order=created_at.asc" }),
+      cloudRequest("expenses", { query: "?select=id,payload&order=created_at.asc" }),
+    ]);
+
+    const cloudShifts = (shiftResult || []).map(normalizeCloudShift);
+    const cloudExpenses = (expenseResult || []).map(normalizeCloudExpense);
+
+    if (cloudShifts.length || cloudExpenses.length) {
+      shifts = cloudShifts;
+      expenses = cloudExpenses;
+      selectedDay = latestDataDate();
+      elements.dayPicker.value = selectedDay;
+      saveShifts();
+      saveExpenses();
+      renderAll();
+    }
+    setSyncStatus(
+      cloudShifts.length || cloudExpenses.length
+        ? "Данные загружены из Supabase, localStorage остается резервной копией."
+        : "Supabase подключен, но облачная база пока пустая.",
+    );
+  } catch (error) {
+    setSyncStatus("Supabase ждет настройки таблиц. Выполни supabase-schema.sql.");
+    console.warn("Supabase sync unavailable, using local data.", error);
+  }
+}
+
+async function saveShiftToCloud(shift) {
+  if (!hasCloudStorage()) return shift;
+
+  const payload = stripRemoteId(shift);
+  try {
+    if (shift.remoteId) {
+      await cloudRequest("shifts", {
+        method: "PATCH",
+        query: `?id=eq.${encodeURIComponent(shift.remoteId)}`,
+        body: { payload },
+      });
+      return shift;
+    }
+
+    const [data] = await cloudRequest("shifts", { method: "POST", body: { payload } });
+    return { ...shift, remoteId: data.id };
+  } catch (error) {
+    console.warn("Shift was saved locally but not synced to Supabase.", error);
+    return shift;
+  }
+}
+
+async function saveExpenseToCloud(expense) {
+  if (!hasCloudStorage()) return expense;
+
+  const payload = stripRemoteId(expense);
+  try {
+    if (expense.remoteId) {
+      await cloudRequest("expenses", {
+        method: "PATCH",
+        query: `?id=eq.${encodeURIComponent(expense.remoteId)}`,
+        body: { payload },
+      });
+      return expense;
+    }
+
+    const [data] = await cloudRequest("expenses", { method: "POST", body: { payload } });
+    return { ...expense, remoteId: data.id };
+  } catch (error) {
+    console.warn("Expense was saved locally but not synced to Supabase.", error);
+    return expense;
+  }
+}
+
+async function deleteCloudRow(table, remoteId) {
+  if (!hasCloudStorage() || !remoteId) return;
+
+  try {
+    await cloudRequest(table, {
+      method: "DELETE",
+      query: `?id=eq.${encodeURIComponent(remoteId)}`,
+      prefer: "return=minimal",
+    });
+  } catch (error) {
+    console.warn(`Could not delete ${table} row from Supabase.`, error);
+  }
+}
+
+async function replaceCloudTable(table, items) {
+  if (!hasCloudStorage()) return;
+
+  try {
+    await cloudRequest(table, {
+      method: "DELETE",
+      query: "?id=neq.00000000-0000-0000-0000-000000000000",
+      prefer: "return=minimal",
+    });
+
+    if (!items.length) return;
+
+    const data = await cloudRequest(table, {
+      method: "POST",
+      body: items.map((item) => ({ payload: stripRemoteId(item) })),
+    });
+
+    data.forEach((row, index) => {
+      items[index].remoteId = row.id;
+    });
+  } catch (error) {
+    console.warn(`Could not replace ${table} data in Supabase.`, error);
+  }
 }
 
 function readStorage(key = STORAGE_KEY) {
@@ -228,6 +393,7 @@ function normalizeShift(shift) {
 
 function normalizeExpense(expense) {
   return {
+    remoteId: expense.remoteId,
     date: expense.date,
     category: expense.category || "Прочие",
     description: expense.description || "",
@@ -1030,14 +1196,17 @@ window.addEventListener("hashchange", () => {
   setView(location.hash.replace("#", ""));
 });
 
-elements.shiftForm.addEventListener("submit", (event) => {
+elements.shiftForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const formData = new FormData(elements.shiftForm);
-  const nextShift = shiftFromForm(formData);
+  let nextShift = shiftFromForm(formData);
 
   if (editingShiftIndex >= 0) {
+    nextShift.remoteId = shifts[editingShiftIndex]?.remoteId;
+    nextShift = await saveShiftToCloud(nextShift);
     shifts[editingShiftIndex] = nextShift;
   } else {
+    nextShift = await saveShiftToCloud(nextShift);
     shifts.push(nextShift);
   }
 
@@ -1056,6 +1225,7 @@ elements.csvImport.addEventListener("change", async (event) => {
   if (imported.length) {
     resetShiftForm();
     shifts = imported;
+    await replaceCloudTable("shifts", shifts);
     selectedDay = latestDataDate();
     elements.dayPicker.value = selectedDay;
     saveShifts();
@@ -1073,6 +1243,7 @@ elements.expenseImport.addEventListener("change", async (event) => {
   if (imported.length) {
     resetExpenseForm();
     expenses = imported;
+    await replaceCloudTable("expenses", expenses);
     saveExpenses();
     renderAll();
   }
@@ -1080,14 +1251,17 @@ elements.expenseImport.addEventListener("change", async (event) => {
   event.target.value = "";
 });
 
-elements.expenseForm.addEventListener("submit", (event) => {
+elements.expenseForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const formData = new FormData(elements.expenseForm);
-  const nextExpense = expenseFromForm(formData);
+  let nextExpense = expenseFromForm(formData);
 
   if (editingExpenseIndex >= 0) {
+    nextExpense.remoteId = expenses[editingExpenseIndex]?.remoteId;
+    nextExpense = await saveExpenseToCloud(nextExpense);
     expenses[editingExpenseIndex] = nextExpense;
   } else {
+    nextExpense = await saveExpenseToCloud(nextExpense);
     expenses.push(nextExpense);
   }
 
@@ -1115,12 +1289,13 @@ elements.rawShiftList.addEventListener("click", (event) => {
   editShift(Number(button.dataset.editIndex));
 });
 
-elements.rawShiftList.addEventListener("click", (event) => {
+elements.rawShiftList.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-delete-index]");
   if (!button) return;
 
   const deleteIndex = Number(button.dataset.deleteIndex);
-  shifts.splice(deleteIndex, 1);
+  const [deletedShift] = shifts.splice(deleteIndex, 1);
+  await deleteCloudRow("shifts", deletedShift?.remoteId);
   if (editingShiftIndex === deleteIndex) resetShiftForm();
   if (editingShiftIndex > deleteIndex) editingShiftIndex -= 1;
   selectedDay = latestDataDate();
@@ -1136,12 +1311,13 @@ elements.rawShiftList.addEventListener("click", (event) => {
   editExpense(Number(button.dataset.editExpenseIndex));
 });
 
-elements.rawShiftList.addEventListener("click", (event) => {
+elements.rawShiftList.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-delete-expense-index]");
   if (!button) return;
 
   const deleteIndex = Number(button.dataset.deleteExpenseIndex);
-  expenses.splice(deleteIndex, 1);
+  const [deletedExpense] = expenses.splice(deleteIndex, 1);
+  await deleteCloudRow("expenses", deletedExpense?.remoteId);
   if (editingExpenseIndex === deleteIndex) resetExpenseForm();
   if (editingExpenseIndex > deleteIndex) editingExpenseIndex -= 1;
   saveExpenses();
@@ -1158,25 +1334,27 @@ elements.cancelExpenseEdit.addEventListener("click", () => {
   renderShiftTables();
 });
 
-elements.clearData.addEventListener("click", () => {
+elements.clearData.addEventListener("click", async () => {
   shifts = [];
   expenses = [];
   selectedDay = new Date().toISOString().slice(0, 10);
   elements.dayPicker.value = selectedDay;
   resetShiftForm();
   resetExpenseForm();
+  await Promise.all([replaceCloudTable("shifts", shifts), replaceCloudTable("expenses", expenses)]);
   saveShifts();
   saveExpenses();
   renderAll();
 });
 
-elements.loadDemo.addEventListener("click", () => {
+elements.loadDemo.addEventListener("click", async () => {
   shifts = [...seedShifts];
   expenses = [...seedExpenses];
   selectedDay = latestDataDate();
   elements.dayPicker.value = selectedDay;
   resetShiftForm();
   resetExpenseForm();
+  await Promise.all([replaceCloudTable("shifts", shifts), replaceCloudTable("expenses", expenses)]);
   saveShifts();
   saveExpenses();
   renderAll();
@@ -1188,3 +1366,4 @@ elements.dayPicker.value = selectedDay;
 updateDayPickerVisibility();
 setView(location.hash.replace("#", ""));
 renderAll();
+loadCloudData();
