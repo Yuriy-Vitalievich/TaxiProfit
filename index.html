@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaxiProfit</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="TaxiProfit dashboard">
+          <span class="brand-mark" aria-hidden="true">🚖</span>
+          <span>
+            <strong>TaxiProfit</strong>
+            <small>driver cockpit</small>
+          </span>
+        </a>
+
+        <div class="top-actions">
+          <div class="period-switch" role="group" aria-label="Период">
+            <button class="period active" type="button" data-period="all">Всё</button>
+            <button class="period" type="button" data-period="day">День</button>
+            <button class="period" type="button" data-period="week">Неделя</button>
+            <button class="period" type="button" data-period="month">Месяц</button>
+            <button class="period" type="button" data-period="year">Год</button>
+          </div>
+          <label class="day-picker" id="dayPickerWrap" aria-label="Выбор дня">
+            <input id="dayPicker" type="date" />
+          </label>
+          <button class="icon-button" type="button" aria-label="Настройки">⚙</button>
+          <button class="profile-button" type="button" aria-label="Профиль">АК</button>
+        </div>
+      </header>
+
+      <nav class="screen-tabs" aria-label="Разделы приложения">
+        <a class="screen-tab active" href="#dashboard" data-view="dashboard">Cockpit</a>
+        <a class="screen-tab" href="#data" data-view="data">Данные</a>
+      </nav>
+
+      <main class="dashboard view-panel active" data-view-panel="dashboard">
+        <section class="hero-grid" aria-label="Главные показатели">
+          <article class="glass-card kpi-card primary-kpi">
+            <div class="primary-kpi-copy">
+              <div class="card-topline">
+                <span>Чистая прибыль</span>
+                <strong class="profit" id="profitDelta">+12%</strong>
+              </div>
+              <div class="mega-value" id="netProfit">₴ 42 580</div>
+              <p id="profitFormula">Выручка минус расходы за выбранный период</p>
+            </div>
+
+            <div class="mini-bars" aria-label="Мини-график дохода за выбранный период">
+              <div class="mini-chart-head">
+                <span>Доход по дням</span>
+                <strong id="bestDayLabel">Лучший доход: 9 мая</strong>
+              </div>
+              <div class="mini-bars-plot" id="miniBars" aria-hidden="true">
+                <span style="height: 34%"></span>
+                <span style="height: 46%"></span>
+                <span style="height: 39%"></span>
+                <span style="height: 62%"></span>
+                <span class="best" style="height: 88%"></span>
+                <span style="height: 71%"></span>
+                <span style="height: 56%"></span>
+              </div>
+              <div class="mini-bars-caption">
+                <span id="miniStartLabel">Пн</span>
+                <strong id="miniMaxLabel">Макс ₴5 800</strong>
+                <span id="miniEndLabel">Вс</span>
+              </div>
+            </div>
+          </article>
+
+          <div class="kpi-stack">
+            <article class="glass-card kpi-card shift-card">
+              <div class="card-topline">
+                <span>Смен отработано</span>
+                <strong class="profit" id="hourDelta">↑</strong>
+              </div>
+              <div class="kpi-value" id="shiftCount">18</div>
+              <p id="avgProfitText">Средняя прибыль за смену</p>
+            </article>
+
+            <article class="glass-card kpi-card danger-card mileage-card">
+              <div class="card-topline">
+                <span>Пробег итого</span>
+                <strong class="loss" id="fuelDelta">+14%</strong>
+              </div>
+              <div class="kpi-value" id="mileageTotal">1 689 км</div>
+              <p id="avgMileageText">Средний пробег за смену</p>
+            </article>
+
+            <article class="glass-card kpi-card orders-card">
+              <div class="card-topline">
+                <span>Заказов всего</span>
+                <strong id="onlineBadge">86 ч</strong>
+              </div>
+              <div class="kpi-value" id="orderCount">281</div>
+              <p id="avgOrdersText">Среднее кол-во заказов за смену</p>
+            </article>
+          </div>
+
+          <article class="glass-card assistant-panel average-card">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker ai">Средние показатели</span>
+                <h2>За смену</h2>
+              </div>
+            </div>
+            <div class="forecast-card">
+              <span>Средняя прибыль</span>
+              <strong id="avgProfitValue">₴ 538</strong>
+              <p id="avgRevenueExpenseText">Выручка и расходы за смену</p>
+            </div>
+            <div class="insight-list">
+              <article class="insight-card hot">
+                <strong>Средняя выручка</strong>
+                <p id="avgRevenueText">₴ 2 610 за смену</p>
+              </article>
+              <article class="insight-card warn">
+                <strong>Средние расходы</strong>
+                <p id="avgExpenseText">₴ 2 072 за смену</p>
+              </article>
+              <article class="insight-card idea">
+                <strong>Пробег и заказы</strong>
+                <p id="avgOpsText">15.6 заказов · 93.9 км за смену</p>
+              </article>
+            </div>
+          </article>
+
+        </section>
+
+        <div id="incomeChart" hidden></div>
+
+        <section class="analytics-grid">
+          <article class="panel heatmap-panel">
+            <div class="section-head">
+              <div>
+                <span class="section-kicker">Killer feature</span>
+                <h2>Heatmap заработка</h2>
+              </div>
+              <span class="muted">день × час</span>
+            </div>
+            <div class="heatmap" id="heatmap" aria-label="Тепловая карта заработка"></div>
+            <div class="heat-legend">
+              <span>меньше денег</span>
+              <i></i><i></i><i></i><i></i>
+              <span>пик</span>
+            </div>
+          </article>
+
+          <article class="panel expense-panel">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker">Расходы</span>
+                <h2>Куда ушли деньги</h2>
+              </div>
+            </div>
+            <div class="donut-wrap">
+              <div class="donut" aria-label="Круговая диаграмма расходов"></div>
+              <div class="donut-center">
+                <span>Всего</span>
+                <strong id="totalExpenses">₴ 19 870</strong>
+              </div>
+            </div>
+            <ul class="expense-list">
+              <li><span class="dot fuel"></span>Топливо <strong id="fuelExpense">₴ 9 240</strong></li>
+              <li><span class="dot rent"></span>Аренда <strong id="rentExpense">₴ 5 800</strong></li>
+              <li><span class="dot wash"></span>Мойка <strong id="washExpense">₴ 1 230</strong></li>
+              <li><span class="dot fine"></span>Штраф <strong id="fineExpense">₴ 0</strong></li>
+              <li><span class="dot repair"></span>Ремонт <strong id="repairExpense">₴ 0</strong></li>
+              <li><span class="dot fee"></span>Прочее <strong id="otherExpense">₴ 0</strong></li>
+            </ul>
+          </article>
+
+          <article class="panel goal-panel">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker">Цель месяца</span>
+                <h2>₴ 70 000</h2>
+              </div>
+              <strong class="goal-percent" id="goalPercent">61%</strong>
+            </div>
+            <div class="goal-track" aria-label="Прогресс цели">
+              <span id="goalProgress"></span>
+            </div>
+            <p id="goalText">Осталось ₴ 27 420. При текущем темпе цель будет закрыта 28 мая.</p>
+          </article>
+        </section>
+
+        <section class="panel days-panel">
+          <div class="section-head">
+            <div>
+              <span class="section-kicker">Календарь</span>
+              <h2>Рабочие и выходные дни</h2>
+            </div>
+            <span class="muted" id="daysSummary">0 рабочих · 0 выходных</span>
+          </div>
+          <div class="days-grid" id="daysGrid" aria-label="Календарь рабочих и выходных дней"></div>
+        </section>
+
+        <section class="panel shifts-panel">
+          <div class="section-head">
+            <div>
+              <span class="section-kicker">История</span>
+              <h2>Последние смены</h2>
+            </div>
+            <button class="ghost-button" type="button">Экспорт</button>
+          </div>
+          <div class="shift-table" id="shiftTable" aria-label="Последние смены">
+            <div class="table-row table-head">
+              <span>Дата</span>
+              <span>Статус</span>
+              <span>Касса</span>
+              <span>Чистыми</span>
+              <span>Эффективность</span>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <main class="data-entry view-panel" data-view-panel="data">
+        <section class="panel data-intro">
+          <div>
+            <span class="section-kicker ai">Источник данных</span>
+            <h1>Ввод смен</h1>
+            <p>Пока без интеграций: водитель добавляет смены вручную, а cockpit сразу пересчитывает прибыль, расходы, графики и эффективность.</p>
+          </div>
+          <div class="data-source-card">
+            <span>Хранение</span>
+            <strong>localStorage</strong>
+            <p>Данные остаются в браузере после обновления страницы.</p>
+          </div>
+        </section>
+
+        <section class="data-grid">
+          <form class="panel shift-form" id="shiftForm">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker">Новая смена</span>
+                <h2>Добавить данные</h2>
+              </div>
+              <button class="ghost-button" type="button" id="loadDemo">Демо</button>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                Дата
+                <input name="date" type="date" required />
+              </label>
+              <label>
+                Начало
+                <input name="start" type="time" value="17:30" required />
+              </label>
+              <label>
+                Конец
+                <input name="end" type="time" value="23:30" />
+              </label>
+              <label>
+                Часы онлайн
+                <input name="hours" type="number" min="0" step="0.1" placeholder="8.5" required />
+              </label>
+              <label>
+                Выручка Uklon, ₴
+                <input name="grossUklon" type="number" min="0" step="0.01" placeholder="3605.80" />
+              </label>
+              <label>
+                Выручка Bolt, ₴
+                <input name="grossBolt" type="number" min="0" step="0.01" placeholder="0" />
+              </label>
+              <label>
+                Наличные, ₴
+                <input name="grossCash" type="number" min="0" step="0.01" placeholder="0" />
+              </label>
+              <label>
+                Касса итого, ₴
+                <input name="gross" type="number" min="0" step="1" placeholder="авто из каналов" />
+              </label>
+              <label>
+                Топливо, ₴
+                <input name="fuel" type="number" min="0" step="1" placeholder="0" />
+              </label>
+              <label>
+                Аренда, ₴
+                <input name="rent" type="number" min="0" step="1" placeholder="800" />
+              </label>
+              <label>
+                Прочие расходы, ₴
+                <input name="other" type="number" min="0" step="1" placeholder="120" />
+              </label>
+              <label>
+                Заказов Uklon
+                <input name="ordersUklon" type="number" min="0" step="1" placeholder="18" />
+              </label>
+              <label>
+                Заказов Bolt
+                <input name="ordersBolt" type="number" min="0" step="1" placeholder="0" />
+              </label>
+              <label>
+                Заказов нал
+                <input name="ordersCash" type="number" min="0" step="1" placeholder="0" />
+              </label>
+              <label>
+                Пробег, км
+                <input name="km" type="number" min="0" step="0.1" placeholder="113.5" />
+              </label>
+              <label class="wide-field">
+                Комментарий
+                <input name="comment" type="text" placeholder="заметка из таблицы" />
+              </label>
+            </div>
+
+            <button class="submit-button" type="submit">Добавить смену</button>
+          </form>
+
+          <form class="panel shift-form expense-entry-form" id="expenseForm">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker">Журнал расходов</span>
+                <h2>Добавить расход</h2>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                Дата
+                <input name="date" type="date" required />
+              </label>
+              <label>
+                Категория
+                <select name="category">
+                  <option>Аренда авто</option>
+                  <option>Топливо</option>
+                  <option>Мойка</option>
+                  <option>Штраф</option>
+                  <option>Комиссии</option>
+                  <option>Прочие</option>
+                </select>
+              </label>
+              <label>
+                Описание
+                <input name="description" type="text" placeholder="UKRNAFTA" />
+              </label>
+              <label>
+                Сумма, ₴
+                <input name="amount" type="number" min="0" step="0.01" placeholder="2700" required />
+              </label>
+              <label>
+                Оплата
+                <input name="payment" type="text" placeholder="Карта" />
+              </label>
+              <label>
+                Комментарий
+                <input name="comment" type="text" placeholder="Полный бак" />
+              </label>
+            </div>
+
+            <button class="submit-button" type="submit">Добавить расход</button>
+          </form>
+
+          <section class="panel raw-data-panel">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker">База</span>
+                <h2>Введенные смены</h2>
+              </div>
+              <button class="ghost-button danger" type="button" id="clearData">Очистить</button>
+            </div>
+            <label class="import-box">
+              <span>Импорт из Google Sheets CSV</span>
+              <input id="csvImport" type="file" accept=".csv,text/csv" />
+            </label>
+            <label class="import-box">
+              <span>Импорт листа “Расходы” CSV</span>
+              <input id="expenseImport" type="file" accept=".csv,text/csv" />
+            </label>
+            <div class="raw-list" id="rawShiftList"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
