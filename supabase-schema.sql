@@ -14,8 +14,16 @@ create table if not exists public.expenses (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.settings (
+  key text primary key,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 alter table public.shifts replica identity full;
 alter table public.expenses replica identity full;
+alter table public.settings replica identity full;
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -39,8 +47,15 @@ before update on public.expenses
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists set_settings_updated_at on public.settings;
+create trigger set_settings_updated_at
+before update on public.settings
+for each row
+execute function public.set_updated_at();
+
 alter table public.shifts enable row level security;
 alter table public.expenses enable row level security;
+alter table public.settings enable row level security;
 
 drop policy if exists "Public read shifts" on public.shifts;
 create policy "Public read shifts"
@@ -92,6 +107,25 @@ on public.expenses for delete
 to anon
 using (true);
 
+drop policy if exists "Public read settings" on public.settings;
+create policy "Public read settings"
+on public.settings for select
+to anon
+using (true);
+
+drop policy if exists "Public insert settings" on public.settings;
+create policy "Public insert settings"
+on public.settings for insert
+to anon
+with check (true);
+
+drop policy if exists "Public update settings" on public.settings;
+create policy "Public update settings"
+on public.settings for update
+to anon
+using (true)
+with check (true);
+
 do $$
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
@@ -113,6 +147,16 @@ begin
         and tablename = 'expenses'
     ) then
       alter publication supabase_realtime add table public.expenses;
+    end if;
+
+    if not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = 'settings'
+    ) then
+      alter publication supabase_realtime add table public.settings;
     end if;
   end if;
 end

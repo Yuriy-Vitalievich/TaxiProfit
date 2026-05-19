@@ -178,7 +178,10 @@
             <div class="section-head tight">
               <div>
                 <span class="section-kicker">Цель месяца</span>
-                <h2>₴ 70 000</h2>
+                <label class="goal-control">
+                  <span>₴</span>
+                  <input id="goalInput" type="number" min="1" step="500" value="70000" aria-label="Цель месяца" />
+                </label>
               </div>
               <strong class="goal-percent" id="goalPercent">61%</strong>
             </div>
@@ -394,6 +397,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=realtime-1"></script>
+    <script src="app.js?v=goal-calendar-2"></script>
   </body>
 </html>

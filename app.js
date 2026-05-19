@@ -1,7 +1,8 @@
 const STORAGE_KEY = "taxiProfit.shifts.v3";
 const EXPENSE_STORAGE_KEY = "taxiProfit.expenses.v1";
 const CSV_SYNC_STORAGE_KEY = "taxiProfit.csvSync.v1";
-const MONTH_GOAL = 70000;
+const GOAL_STORAGE_KEY = "taxiProfit.monthGoal.v1";
+const DEFAULT_MONTH_GOAL = 70000;
 const SUPABASE_URL = "https://aqogfuzhjqbsanaovcox.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HHwwAnF8AfI0IW1CdlROtg_sOjD-Wl_";
 const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
@@ -94,6 +95,7 @@ const elements = {
   repairExpense: document.querySelector("#repairExpense"),
   otherExpense: document.querySelector("#otherExpense"),
   syncStatus: document.querySelector("#syncStatus"),
+  goalInput: document.querySelector("#goalInput"),
   goalPercent: document.querySelector("#goalPercent"),
   goalProgress: document.querySelector("#goalProgress"),
   goalText: document.querySelector("#goalText"),
@@ -132,9 +134,11 @@ let selectedDay = latestDataDate();
 let editingShiftIndex = -1;
 let editingExpenseIndex = -1;
 let hoursEditedManually = false;
+let monthGoal = loadMonthGoal();
 let realtimeClient = null;
 let realtimeReloadTimer = null;
 let cloudLoadedOnce = false;
+let settingsSaveTimer = null;
 
 function loadShifts() {
   const saved = readStorage();
@@ -177,6 +181,16 @@ function loadCsvSyncMeta() {
   } catch {
     return {};
   }
+}
+
+function loadMonthGoal() {
+  const saved = Number(readStorage(GOAL_STORAGE_KEY));
+  return Number.isFinite(saved) && saved > 0 ? saved : DEFAULT_MONTH_GOAL;
+}
+
+function saveMonthGoal(value) {
+  monthGoal = Number.isFinite(value) && value > 0 ? value : DEFAULT_MONTH_GOAL;
+  writeStorage(String(monthGoal), GOAL_STORAGE_KEY);
 }
 
 function saveCsvSyncMeta(type, count) {
@@ -282,6 +296,23 @@ function normalizeCloudExpense(row) {
   return normalizeExpense({ ...(row.payload || {}), remoteId: row.id });
 }
 
+async function loadCloudSettings() {
+  if (!hasCloudStorage()) return false;
+
+  try {
+    const [settings] = await cloudRequest("settings", { query: "?key=eq.dashboard&select=payload&limit=1" });
+    const nextGoal = Number(settings?.payload?.monthGoal);
+    if (Number.isFinite(nextGoal) && nextGoal > 0) {
+      saveMonthGoal(nextGoal);
+      renderAll();
+    }
+    return true;
+  } catch (error) {
+    console.warn("Cloud settings are unavailable, using local settings.", error);
+    return false;
+  }
+}
+
 async function loadCloudData({ applyEmpty = false, silent = false } = {}) {
   if (!hasCloudStorage()) {
     setSyncStatus("Облако недоступно, работаем с локальной копией.");
@@ -332,7 +363,15 @@ function scheduleCloudReload(message = "Данные обновлены на д�
   }, REALTIME_REFRESH_DELAY);
 }
 
-function setupRealtimeSync() {
+function scheduleSettingsReload() {
+  window.clearTimeout(realtimeReloadTimer);
+  realtimeReloadTimer = window.setTimeout(async () => {
+    await loadCloudSettings();
+    setSyncStatus("Realtime включен: данные синхронизируются между устройствами.");
+  }, REALTIME_REFRESH_DELAY);
+}
+
+function setupRealtimeSync({ includeSettings = false } = {}) {
   if (!hasRealtimeClient()) {
     setSyncStatus("Supabase работает через REST. Для realtime нужен supabase-js CDN.");
     return;
@@ -346,25 +385,54 @@ function setupRealtimeSync() {
     },
   });
 
-  realtimeClient
+  const channel = realtimeClient
     .channel("taxiprofit-live")
     .on("postgres_changes", { event: "*", schema: "public", table: "shifts" }, () => {
       scheduleCloudReload("Смены обновлены в облаке.");
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "expenses" }, () => {
       scheduleCloudReload("Расходы обновлены в облаке.");
-    })
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        setSyncStatus("Realtime включен: данные синхронизируются между устройствами.");
-      }
-      if (status === "CHANNEL_ERROR") {
-        setSyncStatus("Realtime ждет настройки Supabase. Проверь supabase-schema.sql.");
-      }
-      if (status === "CLOSED") {
-        setSyncStatus("Realtime отключен. Изменения сохраняются, но обновятся после перезагрузки.");
-      }
     });
+
+  if (includeSettings) {
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "settings" }, () => {
+      scheduleSettingsReload();
+    });
+  }
+
+  channel.subscribe((status) => {
+    if (status === "SUBSCRIBED") {
+      setSyncStatus("Realtime включен: данные синхронизируются между устройствами.");
+    }
+    if (status === "CHANNEL_ERROR") {
+      setSyncStatus("Realtime ждет настройки Supabase. Проверь supabase-schema.sql.");
+    }
+    if (status === "CLOSED") {
+      setSyncStatus("Realtime отключен. Изменения сохраняются, но обновятся после перезагрузки.");
+    }
+  });
+}
+
+async function saveSettingsToCloud() {
+  if (!hasCloudStorage()) return;
+
+  try {
+    await cloudRequest("settings", {
+      method: "POST",
+      query: "?on_conflict=key",
+      body: { key: "dashboard", payload: { monthGoal } },
+      prefer: "resolution=merge-duplicates,return=representation",
+    });
+  } catch (error) {
+    console.warn("Settings were saved locally but not synced to Supabase.", error);
+  }
+}
+
+function scheduleSettingsSave() {
+  window.clearTimeout(settingsSaveTimer);
+  settingsSaveTimer = window.setTimeout(() => {
+    saveSettingsToCloud();
+  }, 500);
 }
 
 async function saveShiftToCloud(shift) {
@@ -663,9 +731,9 @@ function periodSummary(period) {
   const current = currentRange(period);
   const currentExpenses = expenseRange(period);
   const workedDays = new Set(current.filter(isWorkShift).map((shift) => shift.date).filter(Boolean));
-  const knownDays = new Set(current.map((shift) => shift.date).filter(Boolean));
+  const calendarDays = dayRecords(period);
   const shiftsWorked = workedDays.size;
-  const daysOff = [...knownDays].filter((date) => !workedDays.has(date)).length;
+  const daysOff = calendarDays.filter((record) => !record.isWorkday).length;
   const hours = sum(current, "hours");
   const gross = sum(current, "gross");
   const orders = current.reduce((total, shift) => total + totalOrders(shift), 0);
@@ -879,9 +947,11 @@ function renderExpenses(summary) {
 
 function renderGoal(summary) {
   const monthNet = periodSummary("month").net;
-  const progress = Math.min(100, Math.round((monthNet / MONTH_GOAL) * 100));
-  const rest = Math.max(0, MONTH_GOAL - monthNet);
+  const goal = Math.max(monthGoal, 1);
+  const progress = Math.min(100, Math.round((monthNet / goal) * 100));
+  const rest = Math.max(0, goal - monthNet);
 
+  if (elements.goalInput) elements.goalInput.value = String(monthGoal);
   elements.goalPercent.textContent = `${progress}%`;
   elements.goalProgress.style.width = `${progress}%`;
   elements.goalText.textContent = rest
@@ -889,9 +959,55 @@ function renderGoal(summary) {
     : "Цель месяца закрыта. Все, дальше уже бонусная зона.";
 }
 
+function dateKey(value) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(value, days) {
+  const next = new Date(value);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function calendarBounds(period, source) {
+  const dates = source.map((shift) => shift.date).filter(Boolean).sort();
+  if (!dates.length) return period === "all" ? null : periodBounds(period);
+
+  if (period !== "all") {
+    const bounds = periodBounds(period);
+    const latestSourceDay = new Date(`${dates[dates.length - 1]}T23:59:59.999`);
+    return {
+      start: bounds.start,
+      end: latestSourceDay < bounds.end ? latestSourceDay : bounds.end,
+    };
+  }
+
+  return {
+    start: new Date(`${dates[0]}T00:00:00`),
+    end: new Date(`${dates[dates.length - 1]}T23:59:59.999`),
+  };
+}
+
 function dayRecords(period) {
   const source = currentRange(period === "day" ? "day" : period);
   const grouped = new Map();
+  const bounds = calendarBounds(period, source);
+
+  if (bounds) {
+    for (let day = new Date(bounds.start); day <= bounds.end; day = addDays(day, 1)) {
+      grouped.set(dateKey(day), {
+        date: dateKey(day),
+        shifts: [],
+        gross: 0,
+        hours: 0,
+        orders: 0,
+        km: 0,
+      });
+    }
+  }
 
   source.forEach((shift) => {
     if (!grouped.has(shift.date)) {
@@ -934,16 +1050,16 @@ function renderDays(summary) {
     .map((record) => {
       const status = record.isWorkday ? "Рабочий" : "Выходной";
       const className = record.isWorkday ? "workday" : "offday";
-      const netValue = record.gross - record.expenses;
+      const dayGross = Number(record.gross || 0);
 
       return `
         <article class="day-card ${className}">
           <div>
             <strong>${formatDate(record.date)}</strong>
-            <span>${status}</span>
+            <span class="day-status">${status}</span>
           </div>
-          <p>${record.isWorkday ? `${Number(record.hours.toFixed(1))} ч · ${record.orders} заказов` : "без смены"}</p>
-          <b>${money(netValue)}</b>
+          <p>${record.isWorkday ? `${Number(record.hours.toFixed(1))} ч · ${record.orders} заказов` : "смены не было"}</p>
+          <b>${money(dayGross)}</b>
         </article>
       `;
     })
@@ -1246,7 +1362,7 @@ function parseSheetDate(value) {
 function shiftsFromCSV(text) {
   return parseCSV(text)
     .slice(2)
-    .filter((row) => parseSheetDate(row[0]) && (parseLocalNumber(row[4]) > 0 || parseLocalNumber(row[11]) > 0))
+    .filter((row) => parseSheetDate(row[0]))
     .map((row) =>
       normalizeShift({
         date: parseSheetDate(row[0]),
@@ -1392,6 +1508,20 @@ elements.importExpensesButton.addEventListener("click", () => {
   elements.expenseImport.click();
 });
 
+elements.goalInput?.addEventListener("change", () => {
+  saveMonthGoal(Number(elements.goalInput.value));
+  scheduleSettingsSave();
+  renderAll();
+});
+
+elements.goalInput?.addEventListener("input", () => {
+  const nextGoal = Number(elements.goalInput.value);
+  if (!Number.isFinite(nextGoal) || nextGoal <= 0) return;
+  saveMonthGoal(nextGoal);
+  scheduleSettingsSave();
+  renderAll();
+});
+
 elements.expenseForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const formData = new FormData(elements.expenseForm);
@@ -1509,6 +1639,9 @@ updateDayPickerVisibility();
 setView(location.hash.replace("#", ""));
 renderCsvSyncStatus();
 renderAll();
-loadCloudData().then((isCloudReady) => {
-  if (isCloudReady) setupRealtimeSync();
+loadCloudData().then(async (isCloudReady) => {
+  if (isCloudReady) {
+    const hasCloudSettings = await loadCloudSettings();
+    setupRealtimeSync({ includeSettings: hasCloudSettings });
+  }
 });
