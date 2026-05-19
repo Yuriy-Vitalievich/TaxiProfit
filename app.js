@@ -1522,7 +1522,12 @@ function setView(view) {
 }
 
 function updatePeriodControls() {
-  if (elements.periodSelect) elements.periodSelect.value = activePeriod;
+  const selectOptions = elements.periodSelect
+    ? [...elements.periodSelect.options].map((option) => option.value)
+    : [];
+  if (elements.periodSelect) {
+    elements.periodSelect.value = selectOptions.includes(activePeriod) ? activePeriod : "all";
+  }
   elements.periodButtons.forEach((item) => item.classList.toggle("active", item.dataset.period === activePeriod));
   elements.dayPickerWrap?.classList.toggle("active", activePeriod === "day");
   elements.rangePickerWrap?.classList.toggle("active", activePeriod === "custom");

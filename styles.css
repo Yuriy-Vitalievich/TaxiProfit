@@ -121,6 +121,17 @@ a {
   min-width: 0;
 }
 
+.period-switch {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  width: min(560px, 48vw);
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
 .range-picker {
   display: none;
 }
@@ -131,7 +142,7 @@ a {
   gap: 7px;
 }
 
-.period-select select,
+.period-more select,
 .range-picker input {
   min-height: 38px;
   border: 1px solid var(--line);
@@ -145,8 +156,8 @@ a {
   outline: none;
 }
 
-.period-select select {
-  width: min(230px, 28vw);
+.period-more select {
+  width: 132px;
   appearance: auto;
 }
 
@@ -161,10 +172,25 @@ a {
   font-weight: 900;
 }
 
-.period-select select:focus,
+.period-more select:focus,
 .range-picker input:focus {
   border-color: rgba(40, 242, 156, 0.5);
   box-shadow: 0 0 0 4px rgba(40, 242, 156, 0.1);
+}
+
+.period {
+  min-height: 34px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.period.active {
+  background: rgba(40, 242, 156, 0.16);
+  color: var(--profit);
+  box-shadow: inset 0 0 0 1px rgba(40, 242, 156, 0.22);
 }
 
 .icon-button,
@@ -1481,8 +1507,9 @@ h2 {
   }
 
   .top-actions,
-  .period-select,
-  .period-select select,
+  .period-switch,
+  .period-more,
+  .period-more select,
   .range-picker.active,
   .range-picker input {
     width: 100%;
@@ -1499,6 +1526,26 @@ h2 {
     height: 38px;
     flex-basis: 38px;
     border-radius: 12px;
+  }
+
+  .period-switch {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    padding: 4px;
+    border-radius: 13px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .period-switch::-webkit-scrollbar {
+    display: none;
+  }
+
+  .period {
+    min-width: max-content;
+    flex: 1 0 72px;
+    padding: 0 12px;
   }
 
   .range-picker.active {

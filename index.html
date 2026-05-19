@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TaxiProfit</title>
-    <link rel="stylesheet" href="styles.css?v=periods-1" />
+    <link rel="stylesheet" href="styles.css?v=periods-ui-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -18,14 +18,17 @@
         </a>
 
         <div class="top-actions">
-          <label class="period-select" aria-label="Период аналитики">
+          <div class="period-switch" role="group" aria-label="Быстрый период">
+            <button class="period active" type="button" data-period="all">Всё</button>
+            <button class="period" type="button" data-period="today">Сегодня</button>
+            <button class="period" type="button" data-period="yesterday">Вчера</button>
+            <button class="period" type="button" data-period="week">Неделя</button>
+            <button class="period" type="button" data-period="month">Месяц</button>
+          </div>
+          <label class="period-more" aria-label="Дополнительный период">
             <select id="periodSelect">
-              <option value="all">За все время</option>
-              <option value="today">Сегодня</option>
-              <option value="yesterday">Вчера</option>
-              <option value="week">Эта неделя</option>
+              <option value="all">Ещё</option>
               <option value="prevWeek">Прошлая неделя</option>
-              <option value="month">Этот месяц</option>
               <option value="prevMonth">Прошлый месяц</option>
               <option value="year">Этот год</option>
               <option value="prevYear">Прошлый год</option>
@@ -406,6 +409,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=periods-1"></script>
+    <script src="app.js?v=periods-ui-1"></script>
   </body>
 </html>
