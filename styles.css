@@ -1338,13 +1338,21 @@ h2 {
 }
 
 @media (max-width: 720px) {
+  body {
+    background:
+      radial-gradient(circle at 20% 4%, rgba(40, 242, 156, 0.1), transparent 24rem),
+      linear-gradient(145deg, #080a10 0%, #0d111b 100%);
+  }
+
   .app-shell {
-    padding: 12px;
+    padding: 10px;
   }
 
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+    gap: 10px;
+    padding: 10px 0 12px;
   }
 
   .top-actions,
@@ -1355,6 +1363,34 @@ h2 {
   .top-actions {
     display: grid;
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+    border-radius: 12px;
+  }
+
+  .period-switch {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    padding: 4px;
+    border-radius: 13px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .period-switch::-webkit-scrollbar {
+    display: none;
+  }
+
+  .period {
+    min-width: max-content;
+    flex: 1 0 66px;
+    padding: 0 12px;
   }
 
   .day-picker.active,
@@ -1391,12 +1427,62 @@ h2 {
 
   .primary-kpi {
     grid-template-columns: 1fr;
+    gap: 14px;
+    min-height: auto;
   }
 
   .glass-card,
   .panel {
     border-radius: 18px;
     padding: 15px;
+  }
+
+  .glass-card:hover,
+  .panel:hover {
+    transform: none;
+  }
+
+  .kpi-stack .kpi-card,
+  .glass-card {
+    min-height: auto;
+  }
+
+  .mega-value {
+    font-size: clamp(2.35rem, 14vw, 3.4rem);
+  }
+
+  .kpi-value {
+    font-size: clamp(2rem, 12vw, 2.65rem);
+  }
+
+  .mini-chart-head,
+  .mini-bars-caption,
+  .card-topline,
+  .expense-list li {
+    align-items: flex-start;
+  }
+
+  .mini-chart-head {
+    flex-direction: column;
+  }
+
+  .mini-chart-head strong,
+  .mini-bars-caption strong {
+    white-space: normal;
+  }
+
+  .mini-bars {
+    padding: 12px;
+  }
+
+  .mini-bars-plot {
+    grid-template-columns: repeat(7, minmax(30px, 1fr));
+    gap: 8px;
+    min-height: 116px;
+  }
+
+  .forecast-card {
+    padding: 14px;
   }
 
   .bar-chart {
@@ -1442,14 +1528,100 @@ h2 {
   .section-head {
     align-items: flex-start;
     flex-direction: column;
+    gap: 9px;
+  }
+
+  .section-head .ghost-button {
+    width: 100%;
+  }
+
+  .data-intro {
+    align-items: stretch;
+  }
+
+  .data-source-card {
+    padding: 14px;
+  }
+
+  .form-grid {
+    gap: 10px;
+  }
+
+  .form-grid input,
+  .form-grid select,
+  .import-box input,
+  .submit-button {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .raw-list {
+    max-height: none;
+  }
+
+  .raw-shift {
+    align-items: stretch;
+    padding: 12px;
+  }
+
+  .raw-shift > div {
+    min-width: 0;
+  }
+
+  .raw-shift strong,
+  .raw-shift span {
+    overflow-wrap: anywhere;
   }
 
   .table-row {
-    min-width: 640px;
+    min-width: 0;
+  }
+
+  .shift-table {
+    overflow: visible;
+  }
+
+  .table-head {
+    display: none;
+  }
+
+  .table-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--line);
+  }
+
+  .table-row > span,
+  .table-row > strong {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--text);
+    text-align: right;
+  }
+
+  .table-row > span::before,
+  .table-row > strong::before {
+    color: var(--muted);
+    content: attr(data-label);
+    font-size: 0.76rem;
+    font-weight: 900;
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+  .score {
+    justify-self: stretch;
   }
 
   .screen-tabs {
     width: 100%;
+    position: sticky;
+    top: 86px;
+    z-index: 8;
+    backdrop-filter: blur(18px);
   }
 
   .screen-tab {
@@ -1458,20 +1630,40 @@ h2 {
 }
 
 @media (max-width: 420px) {
+  .app-shell {
+    padding: 8px;
+  }
+
   .period {
+    flex-basis: 62px;
+    min-height: 36px;
     font-size: 0.74rem;
   }
 
   .mega-value {
-    font-size: 2.55rem;
+    font-size: 2.35rem;
   }
 
   .kpi-value {
     font-size: 2rem;
   }
 
+  .glass-card,
+  .panel {
+    padding: 13px;
+  }
+
+  .donut {
+    width: 156px;
+  }
+
+  .donut-wrap {
+    min-height: 184px;
+  }
+
   .heatmap {
     grid-template-columns: 28px repeat(5, minmax(30px, 1fr));
+    gap: 5px;
   }
 
   .days-grid {

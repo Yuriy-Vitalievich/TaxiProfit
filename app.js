@@ -652,11 +652,11 @@ function renderShiftTables() {
 
       return `
         <div class="table-row ${record.isWorkday ? "" : "off-row"}">
-          <span>${formatDate(record.date)}</span>
-          <span><i class="status-chip ${record.isWorkday ? "work" : "off"}">${record.isWorkday ? "Рабочий" : "Выходной"}</i></span>
-          <span>${money(record.gross)}</span>
-          <strong>${money(clean)}</strong>
-          <span class="score ${scoreClass}">${record.isWorkday ? `${efficiency}%` : "—"}</span>
+          <span data-label="Дата">${formatDate(record.date)}</span>
+          <span data-label="Статус"><i class="status-chip ${record.isWorkday ? "work" : "off"}">${record.isWorkday ? "Рабочий" : "Выходной"}</i></span>
+          <span data-label="Касса">${money(record.gross)}</span>
+          <strong data-label="Чистыми">${money(clean)}</strong>
+          <span class="score ${scoreClass}" data-label="Эффективность">${record.isWorkday ? `${efficiency}%` : "—"}</span>
         </div>
       `;
     })
