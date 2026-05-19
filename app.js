@@ -97,6 +97,7 @@ const elements = {
   dateInput: document.querySelector("#shiftForm [name='date']"),
   startInput: document.querySelector("#shiftForm [name='start']"),
   endInput: document.querySelector("#shiftForm [name='end']"),
+  hoursInput: document.querySelector("#shiftForm [name='hours']"),
   rawShiftList: document.querySelector("#rawShiftList"),
   csvImport: document.querySelector("#csvImport"),
   expenseForm: document.querySelector("#expenseForm"),
@@ -120,6 +121,7 @@ let expenses = loadExpenses();
 let selectedDay = latestDataDate();
 let editingShiftIndex = -1;
 let editingExpenseIndex = -1;
+let hoursEditedManually = false;
 
 function loadShifts() {
   const saved = readStorage();
@@ -242,6 +244,36 @@ function dateValue(shift) {
 function normalizeTime(value) {
   const [hour = "12", minute = "00"] = String(value || "12:00").split(":");
   return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+}
+
+function timeToMinutes(value) {
+  const [hour, minute] = normalizeTime(value).split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+}
+
+function calculateHours(start, end) {
+  if (!start || !end) return "";
+
+  const startMinutes = timeToMinutes(start);
+  const endMinutes = timeToMinutes(end);
+  if (startMinutes === null || endMinutes === null) return "";
+
+  let diff = endMinutes - startMinutes;
+  if (diff < 0) diff += 24 * 60;
+  if (diff === 0) return "";
+
+  const hours = diff / 60;
+  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+}
+
+function updateHoursFromTime({ force = false } = {}) {
+  if (!force && hoursEditedManually) return;
+
+  const calculated = calculateHours(elements.startInput.value, elements.endInput.value);
+  if (calculated) {
+    elements.hoursInput.value = calculated;
+  }
 }
 
 function sortedShifts() {
@@ -782,6 +814,7 @@ function setFormValues(form, values) {
 
 function resetShiftForm() {
   editingShiftIndex = -1;
+  hoursEditedManually = false;
   elements.shiftForm.classList.remove("editing");
   elements.shiftForm.reset();
   elements.dateInput.value = new Date().toISOString().slice(0, 10);
@@ -791,6 +824,7 @@ function resetShiftForm() {
   elements.shiftFormTitle.textContent = "Добавить данные";
   elements.shiftSubmit.textContent = "Добавить смену";
   elements.cancelShiftEdit.hidden = true;
+  updateHoursFromTime({ force: true });
 }
 
 function resetExpenseForm() {
@@ -809,6 +843,7 @@ function editShift(index) {
   if (!shift) return;
 
   editingShiftIndex = index;
+  hoursEditedManually = false;
   elements.shiftForm.classList.add("editing");
   elements.shiftFormKicker.textContent = "Редактирование";
   elements.shiftFormTitle.textContent = "Изменить смену";
@@ -1059,6 +1094,18 @@ elements.expenseForm.addEventListener("submit", (event) => {
   saveExpenses();
   resetExpenseForm();
   renderAll();
+});
+
+elements.startInput.addEventListener("input", () => {
+  updateHoursFromTime();
+});
+
+elements.endInput.addEventListener("input", () => {
+  updateHoursFromTime();
+});
+
+elements.hoursInput.addEventListener("input", () => {
+  hoursEditedManually = true;
 });
 
 elements.rawShiftList.addEventListener("click", (event) => {
