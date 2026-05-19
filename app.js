@@ -62,6 +62,9 @@ const elements = {
   heatmap: document.querySelector("#heatmap"),
   periodButtons: document.querySelectorAll("[data-period]"),
   periodSelect: document.querySelector("#periodSelect"),
+  periodLabel: document.querySelector("#periodLabel"),
+  prevPeriod: document.querySelector("#prevPeriod"),
+  nextPeriod: document.querySelector("#nextPeriod"),
   dayPickerWrap: document.querySelector("#dayPickerWrap"),
   dayPicker: document.querySelector("#dayPicker"),
   rangePickerWrap: document.querySelector("#rangePickerWrap"),
@@ -131,10 +134,11 @@ const elements = {
   loadDemo: document.querySelector("#loadDemo"),
 };
 
-let activePeriod = "all";
 let shifts = loadShifts();
 let expenses = loadExpenses();
 let selectedDay = latestDataDate();
+let activePeriod = "day";
+let periodAnchorDate = new Date(`${selectedDay}T12:00`);
 let customRangeStart = "";
 let customRangeEnd = "";
 let editingShiftIndex = -1;
@@ -709,7 +713,9 @@ function endOfDay(value) {
 }
 
 function periodBounds(period) {
-  const end = todayValue();
+  const anchor = new Date(periodAnchorDate);
+  anchor.setHours(23, 59, 59, 999);
+  const end = anchor;
   const start = new Date(end);
 
   if (period === "day") {
@@ -726,7 +732,10 @@ function periodBounds(period) {
   }
 
   if (period === "week") {
-    return { start: weekStart(end), end };
+    const currentWeekStart = weekStart(new Date());
+    const startOfWeek = weekStart(anchor);
+    const endOfWeek = dateKey(startOfWeek) === dateKey(currentWeekStart) ? todayValue() : endOfDay(addDays(startOfWeek, 6));
+    return { start: startOfWeek, end: endOfWeek };
   }
 
   if (period === "prevWeek") {
@@ -736,7 +745,13 @@ function periodBounds(period) {
   }
 
   if (period === "month") {
-    return { start: monthStart(end), end };
+    const currentMonthStart = monthStart(new Date());
+    const startOfMonth = monthStart(anchor);
+    const endOfMonth =
+      dateKey(startOfMonth) === dateKey(currentMonthStart)
+        ? todayValue()
+        : endOfDay(new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() + 1, 0));
+    return { start: startOfMonth, end: endOfMonth };
   }
 
   if (period === "prevMonth") {
@@ -747,7 +762,13 @@ function periodBounds(period) {
   }
 
   if (period === "year") {
-    return { start: yearStart(end), end };
+    const currentYearStart = yearStart(new Date());
+    const startOfYear = yearStart(anchor);
+    const endOfYear =
+      dateKey(startOfYear) === dateKey(currentYearStart)
+        ? todayValue()
+        : endOfDay(new Date(startOfYear.getFullYear(), 11, 31));
+    return { start: startOfYear, end: endOfYear };
   }
 
   if (period === "prevYear") {
@@ -1476,6 +1497,7 @@ function expensesFromCSV(text) {
 elements.periodButtons.forEach((button) => {
   button.addEventListener("click", () => {
     activePeriod = button.dataset.period;
+    periodAnchorDate = new Date(`${selectedDay || latestDataDate()}T12:00`);
     elements.periodButtons.forEach((item) => item.classList.toggle("active", item === button));
     updatePeriodControls();
     renderAll();
@@ -1483,7 +1505,16 @@ elements.periodButtons.forEach((button) => {
 });
 
 elements.periodSelect?.addEventListener("change", () => {
+  if (!elements.periodSelect.value) return;
   activePeriod = elements.periodSelect.value;
+  if (activePeriod === "today") {
+    selectedDay = dateKey(new Date());
+    periodAnchorDate = new Date(`${selectedDay}T12:00`);
+  }
+  if (activePeriod === "yesterday") {
+    selectedDay = dateKey(addDays(new Date(), -1));
+    periodAnchorDate = new Date(`${selectedDay}T12:00`);
+  }
   updatePeriodControls();
   renderAll();
 });
@@ -1509,6 +1540,14 @@ elements.rangeEnd?.addEventListener("change", () => {
   renderAll();
 });
 
+elements.prevPeriod?.addEventListener("click", () => {
+  shiftVisiblePeriod(-1);
+});
+
+elements.nextPeriod?.addEventListener("click", () => {
+  shiftVisiblePeriod(1);
+});
+
 elements.viewButtons.forEach((button) => {
   button.addEventListener("click", () => {
     setView(button.dataset.view);
@@ -1526,11 +1565,15 @@ function updatePeriodControls() {
     ? [...elements.periodSelect.options].map((option) => option.value)
     : [];
   if (elements.periodSelect) {
-    elements.periodSelect.value = selectOptions.includes(activePeriod) ? activePeriod : "all";
+    elements.periodSelect.value = selectOptions.includes(activePeriod) ? activePeriod : "";
   }
   elements.periodButtons.forEach((item) => item.classList.toggle("active", item.dataset.period === activePeriod));
   elements.dayPickerWrap?.classList.toggle("active", activePeriod === "day");
   elements.rangePickerWrap?.classList.toggle("active", activePeriod === "custom");
+  if (elements.periodLabel) elements.periodLabel.textContent = periodLabel(activePeriod);
+  const canNavigate = ["day", "week", "month", "year"].includes(activePeriod);
+  if (elements.prevPeriod) elements.prevPeriod.disabled = !canNavigate;
+  if (elements.nextPeriod) elements.nextPeriod.disabled = !canNavigate;
 
   if (elements.dayPicker) elements.dayPicker.value = selectedDay;
   if (elements.rangeStart && !elements.rangeStart.value) {
@@ -1541,6 +1584,81 @@ function updatePeriodControls() {
     elements.rangeEnd.value = customRangeEnd || latestDataDate();
     customRangeEnd = elements.rangeEnd.value;
   }
+}
+
+function shiftVisiblePeriod(direction) {
+  if (activePeriod === "day") {
+    const next = addDays(new Date(`${selectedDay}T12:00`), direction);
+    selectedDay = dateKey(next);
+    periodAnchorDate = new Date(`${selectedDay}T12:00`);
+  } else if (activePeriod === "week") {
+    periodAnchorDate = addDays(periodAnchorDate, direction * 7);
+  } else if (activePeriod === "month") {
+    const next = new Date(periodAnchorDate);
+    next.setMonth(next.getMonth() + direction);
+    periodAnchorDate = next;
+  } else if (activePeriod === "year") {
+    const next = new Date(periodAnchorDate);
+    next.setFullYear(next.getFullYear() + direction);
+    periodAnchorDate = next;
+  } else {
+    return;
+  }
+
+  updatePeriodControls();
+  renderAll();
+}
+
+function isSameDate(first, second) {
+  return first === second;
+}
+
+function fullDateLabel(value) {
+  return new Date(`${value}T12:00`).toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
+}
+
+function periodLabel(period) {
+  const today = dateKey(new Date());
+  const yesterday = dateKey(addDays(new Date(), -1));
+
+  if (period === "day") {
+    if (isSameDate(selectedDay, today)) return "Сегодня";
+    if (isSameDate(selectedDay, yesterday)) return "Вчера";
+    return fullDateLabel(selectedDay);
+  }
+
+  if (period === "week") {
+    const { start, end } = periodBounds("week");
+    const currentWeekStart = weekStart(new Date());
+    if (dateKey(start) === dateKey(currentWeekStart)) return "Текущая неделя";
+    return `${formatShortDate(dateKey(start))} - ${formatShortDate(dateKey(end))}`;
+  }
+
+  if (period === "month") {
+    const current = new Date(periodAnchorDate);
+    return current.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  }
+
+  if (period === "year") {
+    return String(periodAnchorDate.getFullYear());
+  }
+
+  if (period === "all") return "За всё время";
+  if (period === "today") return "Сегодня";
+  if (period === "yesterday") return "Вчера";
+  if (period === "prevWeek") return "Прошлая неделя";
+  if (period === "prevMonth") return "Прошлый месяц";
+  if (period === "prevYear") return "Прошлый год";
+  if (period === "custom") {
+    const from = customRangeStart || latestDataDate();
+    const to = customRangeEnd || from;
+    return `${fullDateLabel(from)} - ${fullDateLabel(to)}`;
+  }
+  return "Период";
 }
 
 function updateDayPickerVisibility() {
