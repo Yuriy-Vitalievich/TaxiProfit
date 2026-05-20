@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TaxiProfit</title>
-    <link rel="stylesheet" href="styles.css?v=calendar-polish-1" />
+    <link rel="stylesheet" href="styles.css?v=period-label-calendar-2" />
   </head>
   <body>
     <div class="app-shell">
@@ -24,35 +24,6 @@
             <button class="period" type="button" data-period="month">Месяц</button>
             <button class="period" type="button" data-period="year">Год</button>
           </div>
-          <div class="calendar-menu" id="calendarMenu">
-            <button class="calendar-trigger" type="button" id="calendarToggle" aria-label="Открыть календарь" aria-expanded="false">
-              <span class="calendar-icon" aria-hidden="true"></span>
-            </button>
-            <div class="calendar-popover" id="calendarPopover" hidden>
-              <div class="calendar-popover-head">
-                <strong>Выбрать период</strong>
-                <span>быстро или диапазоном</span>
-              </div>
-              <div class="calendar-presets" aria-label="Быстрые периоды">
-                <button type="button" data-calendar-period="all">За все время</button>
-                <button type="button" data-calendar-period="today">Сегодня</button>
-                <button type="button" data-calendar-period="yesterday">Вчера</button>
-                <button type="button" data-calendar-period="prevWeek">Прошлая неделя</button>
-                <button type="button" data-calendar-period="prevMonth">Прошлый месяц</button>
-                <button type="button" data-calendar-period="prevYear">Прошлый год</button>
-              </div>
-              <div class="range-picker" id="rangePickerWrap" aria-label="Свой период">
-                <label>
-                  <span>Начало</span>
-                  <input id="rangeStart" type="date" />
-                </label>
-                <label>
-                  <span>Конец</span>
-                  <input id="rangeEnd" type="date" />
-                </label>
-              </div>
-            </div>
-          </div>
           <button class="icon-button" type="button" aria-label="Настройки">⚙</button>
           <button class="profile-button" type="button" aria-label="Профиль">АК</button>
         </div>
@@ -60,7 +31,33 @@
 
       <div class="period-navigator" aria-label="Навигация по периоду">
         <button class="period-arrow" type="button" id="prevPeriod" aria-label="Предыдущий период">‹</button>
-        <div class="period-current" id="periodLabel">Сегодня</div>
+        <div class="calendar-menu" id="calendarMenu">
+          <button class="period-current" type="button" id="periodLabel" aria-label="Открыть календарь" aria-expanded="false">Сегодня</button>
+          <div class="calendar-popover" id="calendarPopover" hidden>
+            <div class="calendar-popover-head">
+              <strong>Выбрать период</strong>
+              <span>быстро или диапазоном</span>
+            </div>
+            <div class="calendar-presets" aria-label="Быстрые периоды">
+              <button type="button" data-calendar-period="all">За все время</button>
+              <button type="button" data-calendar-period="today">Сегодня</button>
+              <button type="button" data-calendar-period="yesterday">Вчера</button>
+              <button type="button" data-calendar-period="prevWeek">Прошлая неделя</button>
+              <button type="button" data-calendar-period="prevMonth">Прошлый месяц</button>
+              <button type="button" data-calendar-period="prevYear">Прошлый год</button>
+            </div>
+            <div class="range-picker" id="rangePickerWrap" aria-label="Свой период">
+              <label>
+                <span>Начало</span>
+                <input id="rangeStart" type="date" />
+              </label>
+              <label>
+                <span>Конец</span>
+                <input id="rangeEnd" type="date" />
+              </label>
+            </div>
+          </div>
+        </div>
         <button class="period-arrow" type="button" id="nextPeriod" aria-label="Следующий период">›</button>
       </div>
 
@@ -428,6 +425,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=calendar-polish-1"></script>
+    <script src="app.js?v=period-label-calendar-2"></script>
   </body>
 </html>

@@ -62,7 +62,6 @@ const elements = {
   heatmap: document.querySelector("#heatmap"),
   periodButtons: document.querySelectorAll("[data-period]"),
   calendarMenu: document.querySelector("#calendarMenu"),
-  calendarToggle: document.querySelector("#calendarToggle"),
   calendarPopover: document.querySelector("#calendarPopover"),
   calendarPresetButtons: document.querySelectorAll("[data-calendar-period]"),
   periodLabel: document.querySelector("#periodLabel"),
@@ -1508,21 +1507,21 @@ elements.periodButtons.forEach((button) => {
   });
 });
 
-elements.calendarToggle?.addEventListener("click", () => {
+elements.periodLabel?.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  setCalendarOpen(elements.calendarPopover.hidden);
+});
+
+elements.periodLabel?.addEventListener("keydown", (event) => {
+  if (!["Enter", " "].includes(event.key)) return;
+  event.preventDefault();
   setCalendarOpen(elements.calendarPopover.hidden);
 });
 
 elements.calendarPresetButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    activePeriod = button.dataset.calendarPeriod;
-    if (activePeriod === "today") {
-      selectedDay = dateKey(new Date());
-      periodAnchorDate = new Date(`${selectedDay}T12:00`);
-    }
-    if (activePeriod === "yesterday") {
-      selectedDay = dateKey(addDays(new Date(), -1));
-      periodAnchorDate = new Date(`${selectedDay}T12:00`);
-    }
+    applyCalendarPeriod(button.dataset.calendarPeriod);
     updatePeriodControls();
     setCalendarOpen(false);
     renderAll();
@@ -1583,7 +1582,7 @@ function updatePeriodControls() {
   elements.periodButtons.forEach((item) => item.classList.toggle("active", item.dataset.period === activePeriod));
   elements.dayPickerWrap?.classList.toggle("active", activePeriod === "day");
   elements.calendarPresetButtons.forEach((item) => {
-    item.classList.toggle("active", item.dataset.calendarPeriod === activePeriod);
+    item.classList.toggle("active", isCalendarPresetActive(item.dataset.calendarPeriod));
   });
   if (elements.periodLabel) elements.periodLabel.textContent = periodLabel(activePeriod);
   const canNavigate = ["day", "week", "month", "year"].includes(activePeriod);
@@ -1602,9 +1601,76 @@ function updatePeriodControls() {
 }
 
 function setCalendarOpen(isOpen) {
-  if (!elements.calendarPopover || !elements.calendarToggle) return;
+  if (!elements.calendarPopover || !elements.periodLabel) return;
   elements.calendarPopover.hidden = !isOpen;
-  elements.calendarToggle.setAttribute("aria-expanded", String(isOpen));
+  elements.periodLabel.setAttribute("aria-expanded", String(isOpen));
+}
+
+function applyCalendarPeriod(period) {
+  if (period === "today") {
+    selectedDay = dateKey(new Date());
+    periodAnchorDate = new Date(`${selectedDay}T12:00`);
+    activePeriod = "day";
+    return;
+  }
+
+  if (period === "yesterday") {
+    selectedDay = dateKey(addDays(new Date(), -1));
+    periodAnchorDate = new Date(`${selectedDay}T12:00`);
+    activePeriod = "day";
+    return;
+  }
+
+  if (period === "prevWeek") {
+    const previousWeekDay = addDays(weekStart(new Date()), -1);
+    periodAnchorDate = previousWeekDay;
+    selectedDay = dateKey(previousWeekDay);
+    activePeriod = "week";
+    return;
+  }
+
+  if (period === "prevMonth") {
+    const previousMonth = monthStart(new Date());
+    previousMonth.setDate(0);
+    periodAnchorDate = previousMonth;
+    selectedDay = dateKey(previousMonth);
+    activePeriod = "month";
+    return;
+  }
+
+  if (period === "prevYear") {
+    const previousYear = yearStart(new Date());
+    previousYear.setDate(0);
+    periodAnchorDate = previousYear;
+    selectedDay = dateKey(previousYear);
+    activePeriod = "year";
+    return;
+  }
+
+  activePeriod = period;
+}
+
+function isCalendarPresetActive(period) {
+  const today = dateKey(new Date());
+  const yesterday = dateKey(addDays(new Date(), -1));
+
+  if (period === "today") return activePeriod === "day" && selectedDay === today;
+  if (period === "yesterday") return activePeriod === "day" && selectedDay === yesterday;
+  if (period === "prevWeek") {
+    const previousWeekStart = dateKey(addDays(weekStart(new Date()), -7));
+    return activePeriod === "week" && dateKey(periodBounds("week").start) === previousWeekStart;
+  }
+  if (period === "prevMonth") {
+    const previousMonthStart = monthStart(new Date());
+    previousMonthStart.setMonth(previousMonthStart.getMonth() - 1);
+    return activePeriod === "month" && dateKey(periodBounds("month").start) === dateKey(previousMonthStart);
+  }
+  if (period === "prevYear") {
+    const previousYearStart = yearStart(new Date());
+    previousYearStart.setFullYear(previousYearStart.getFullYear() - 1);
+    return activePeriod === "year" && dateKey(periodBounds("year").start) === dateKey(previousYearStart);
+  }
+  return activePeriod === period;
 }
 
 function shiftVisiblePeriod(direction) {
