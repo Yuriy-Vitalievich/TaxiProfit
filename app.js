@@ -1503,6 +1503,7 @@ elements.periodButtons.forEach((button) => {
     periodAnchorDate = new Date(`${selectedDay || latestDataDate()}T12:00`);
     elements.periodButtons.forEach((item) => item.classList.toggle("active", item === button));
     updatePeriodControls();
+    setCalendarOpen(false);
     renderAll();
   });
 });
@@ -1531,6 +1532,10 @@ elements.calendarPresetButtons.forEach((button) => {
 document.addEventListener("click", (event) => {
   if (!elements.calendarMenu || elements.calendarMenu.contains(event.target)) return;
   setCalendarOpen(false);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") setCalendarOpen(false);
 });
 
 elements.dayPicker?.addEventListener("change", () => {
