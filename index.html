@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TaxiProfit</title>
-    <link rel="stylesheet" href="styles.css?v=period-center-1" />
+    <link rel="stylesheet" href="styles.css?v=quick-shift-form-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -277,71 +277,57 @@
               </div>
             </div>
 
-            <div class="form-grid">
+            <div class="quick-shift-form">
               <label>
                 Дата
                 <input name="date" type="date" required />
               </label>
               <label>
-                Начало
+                Вышел на линию
                 <input name="start" type="time" value="17:30" required />
               </label>
               <label>
-                Конец
-                <input name="end" type="time" value="23:30" />
+                Закончил работу
+                <input name="end" type="time" value="23:30" required />
               </label>
+
+              <div class="platform-field wide-field">
+                <span>Где заработал</span>
+                <div class="platform-options" role="radiogroup" aria-label="Платформа выручки">
+                  <label>
+                    <input type="radio" name="platform" value="Uklon" checked />
+                    <span>Uklon</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="platform" value="Bolt" />
+                    <span>Bolt</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="platform" value="Indrive" />
+                    <span>Indrive</span>
+                  </label>
+                </div>
+              </div>
+
               <label>
-                Часы онлайн
-                <input name="hours" type="number" min="0" step="0.1" placeholder="8.5" required />
-              </label>
-              <label>
-                Выручка Uklon, ₴
-                <input name="grossUklon" type="number" min="0" step="0.01" placeholder="3605.80" />
-              </label>
-              <label>
-                Выручка Bolt, ₴
-                <input name="grossBolt" type="number" min="0" step="0.01" placeholder="0" />
-              </label>
-              <label>
-                Наличные, ₴
-                <input name="grossCash" type="number" min="0" step="0.01" placeholder="0" />
-              </label>
-              <label>
-                Касса итого, ₴
-                <input name="gross" type="number" min="0" step="1" placeholder="авто из каналов" />
-              </label>
-              <label>
-                Топливо, ₴
-                <input name="fuel" type="number" min="0" step="1" placeholder="0" />
-              </label>
-              <label>
-                Аренда, ₴
-                <input name="rent" type="number" min="0" step="1" placeholder="800" />
-              </label>
-              <label>
-                Прочие расходы, ₴
-                <input name="other" type="number" min="0" step="1" placeholder="120" />
-              </label>
-              <label>
-                Заказов Uklon
-                <input name="ordersUklon" type="number" min="0" step="1" placeholder="18" />
-              </label>
-              <label>
-                Заказов Bolt
-                <input name="ordersBolt" type="number" min="0" step="1" placeholder="0" />
-              </label>
-              <label>
-                Заказов нал
-                <input name="ordersCash" type="number" min="0" step="1" placeholder="0" />
+                Выручка, ₴
+                <input name="grossAmount" type="number" min="0" step="0.01" placeholder="3000" required />
               </label>
               <label>
                 Пробег, км
-                <input name="km" type="number" min="0" step="0.1" placeholder="113.5" />
+                <input name="km" type="number" min="0" step="0.1" placeholder="89.4" required />
               </label>
-              <label class="wide-field">
-                Комментарий
-                <input name="comment" type="text" placeholder="заметка из таблицы" />
-              </label>
+
+              <div class="shift-auto-summary wide-field" aria-live="polite">
+                <div>
+                  <span>Часы онлайн</span>
+                  <strong id="shiftHoursPreview">6 ч</strong>
+                </div>
+                <div>
+                  <span>Касса итого</span>
+                  <strong id="shiftGrossPreview">₴ 0</strong>
+                </div>
+              </div>
             </div>
 
             <button class="submit-button" type="submit" id="shiftSubmit">Добавить смену</button>
@@ -424,6 +410,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=remove-demo-1"></script>
+    <script src="app.js?v=quick-shift-form-1"></script>
   </body>
 </html>

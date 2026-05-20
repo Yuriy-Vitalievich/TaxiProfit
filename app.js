@@ -115,7 +115,9 @@ const elements = {
   dateInput: document.querySelector("#shiftForm [name='date']"),
   startInput: document.querySelector("#shiftForm [name='start']"),
   endInput: document.querySelector("#shiftForm [name='end']"),
-  hoursInput: document.querySelector("#shiftForm [name='hours']"),
+  grossAmountInput: document.querySelector("#shiftForm [name='grossAmount']"),
+  shiftHoursPreview: document.querySelector("#shiftHoursPreview"),
+  shiftGrossPreview: document.querySelector("#shiftGrossPreview"),
   rawShiftList: document.querySelector("#rawShiftList"),
   csvImport: document.querySelector("#csvImport"),
   importShiftsButton: document.querySelector("#importShiftsButton"),
@@ -144,7 +146,6 @@ let customRangeStart = "";
 let customRangeEnd = "";
 let editingShiftIndex = -1;
 let editingExpenseIndex = -1;
-let hoursEditedManually = false;
 let monthGoal = loadMonthGoal();
 let realtimeClient = null;
 let realtimeReloadTimer = null;
@@ -581,7 +582,10 @@ function isWorkShift(shift) {
 function normalizeShift(shift) {
   const gross =
     Number(shift.gross || 0) ||
-    Number(shift.grossBolt || 0) + Number(shift.grossUklon || 0) + Number(shift.grossCash || 0);
+    Number(shift.grossBolt || 0) +
+      Number(shift.grossUklon || 0) +
+      Number(shift.grossCash || 0) +
+      Number(shift.grossIndrive || 0);
   return {
     ...shift,
     gross,
@@ -597,6 +601,8 @@ function normalizeShift(shift) {
     grossBolt: Number(shift.grossBolt || 0),
     grossUklon: Number(shift.grossUklon || 0),
     grossCash: Number(shift.grossCash || 0),
+    grossIndrive: Number(shift.grossIndrive || 0),
+    platform: shift.platform || undefined,
   };
 }
 
@@ -642,12 +648,16 @@ function calculateHours(start, end) {
   return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
 }
 
-function updateHoursFromTime({ force = false } = {}) {
-  if (!force && hoursEditedManually) return;
-
+function updateShiftAutoSummary() {
   const calculated = calculateHours(elements.startInput.value, elements.endInput.value);
-  if (calculated) {
-    elements.hoursInput.value = calculated;
+  const gross = Number(elements.grossAmountInput?.value || 0);
+
+  if (elements.shiftHoursPreview) {
+    elements.shiftHoursPreview.textContent = calculated ? `${calculated} ч` : "—";
+  }
+
+  if (elements.shiftGrossPreview) {
+    elements.shiftGrossPreview.textContent = money(gross);
   }
 }
 
@@ -1276,26 +1286,45 @@ function readNumber(formData, key) {
   return Number(formData.get(key) || 0);
 }
 
+function shiftPlatform(shift) {
+  if (shift.platform) return shift.platform;
+  if (Number(shift.grossBolt || 0) > 0) return "Bolt";
+  if (Number(shift.grossUklon || 0) > 0) return "Uklon";
+  if (Number(shift.grossIndrive || shift.grossCash || 0) > 0) return "Indrive";
+  return "Uklon";
+}
+
+function shiftRevenueForPlatform(shift, platform = shiftPlatform(shift)) {
+  if (platform === "Bolt") return Number(shift.grossBolt || 0);
+  if (platform === "Indrive") return Number(shift.grossIndrive || shift.grossCash || 0);
+  if (platform === "Uklon") return Number(shift.grossUklon || 0);
+  return Number(shift.gross || 0);
+}
+
 function shiftFromForm(formData) {
+  const platform = formData.get("platform") || "Uklon";
+  const grossAmount = readNumber(formData, "grossAmount");
+  const hours = Number(calculateHours(formData.get("start"), formData.get("end")) || 0);
+
   return normalizeShift({
     date: formData.get("date"),
     start: formData.get("start"),
     end: formData.get("end"),
-    hours: readNumber(formData, "hours"),
-    ordersBolt: readNumber(formData, "ordersBolt"),
-    ordersUklon: readNumber(formData, "ordersUklon"),
-    ordersCash: readNumber(formData, "ordersCash"),
-    grossBolt: readNumber(formData, "grossBolt"),
-    grossUklon: readNumber(formData, "grossUklon"),
-    grossCash: readNumber(formData, "grossCash"),
-    gross:
-      readNumber(formData, "gross") ||
-      readNumber(formData, "grossBolt") + readNumber(formData, "grossUklon") + readNumber(formData, "grossCash"),
-    fuel: readNumber(formData, "fuel"),
-    rent: readNumber(formData, "rent"),
-    other: readNumber(formData, "other"),
+    hours,
+    platform,
+    ordersBolt: 0,
+    ordersUklon: 0,
+    ordersCash: 0,
+    grossBolt: platform === "Bolt" ? grossAmount : 0,
+    grossUklon: platform === "Uklon" ? grossAmount : 0,
+    grossCash: platform === "Indrive" ? grossAmount : 0,
+    grossIndrive: platform === "Indrive" ? grossAmount : 0,
+    gross: grossAmount,
+    fuel: 0,
+    rent: 0,
+    other: 0,
     km: readNumber(formData, "km"),
-    comment: formData.get("comment"),
+    comment: "",
   });
 }
 
@@ -1319,7 +1348,6 @@ function setFormValues(form, values) {
 
 function resetShiftForm() {
   editingShiftIndex = -1;
-  hoursEditedManually = false;
   elements.shiftForm.classList.remove("editing");
   elements.shiftForm.reset();
   elements.dateInput.value = new Date().toISOString().slice(0, 10);
@@ -1329,7 +1357,7 @@ function resetShiftForm() {
   elements.shiftFormTitle.textContent = "Добавить данные";
   elements.shiftSubmit.textContent = "Добавить смену";
   elements.cancelShiftEdit.hidden = true;
-  updateHoursFromTime({ force: true });
+  updateShiftAutoSummary();
 }
 
 function resetExpenseForm() {
@@ -1348,7 +1376,6 @@ function editShift(index) {
   if (!shift) return;
 
   editingShiftIndex = index;
-  hoursEditedManually = false;
   elements.shiftForm.classList.add("editing");
   elements.shiftFormKicker.textContent = "Редактирование";
   elements.shiftFormTitle.textContent = "Изменить смену";
@@ -1358,20 +1385,11 @@ function editShift(index) {
     date: shift.date,
     start: shift.start || "",
     end: shift.end || "",
-    hours: shift.hours || "",
-    grossUklon: shift.grossUklon || "",
-    grossBolt: shift.grossBolt || "",
-    grossCash: shift.grossCash || "",
-    gross: shift.gross || "",
-    fuel: shift.fuel || "",
-    rent: shift.rent || "",
-    other: shift.other || "",
-    ordersUklon: shift.ordersUklon || "",
-    ordersBolt: shift.ordersBolt || "",
-    ordersCash: shift.ordersCash || "",
+    platform: shiftPlatform(shift),
+    grossAmount: shiftRevenueForPlatform(shift),
     km: shift.km || "",
-    comment: shift.comment || "",
   });
+  updateShiftAutoSummary();
   elements.shiftForm.scrollIntoView({ behavior: "smooth", block: "start" });
   renderShiftTables();
 }
@@ -1857,15 +1875,15 @@ elements.expenseForm.addEventListener("submit", async (event) => {
 });
 
 elements.startInput.addEventListener("input", () => {
-  updateHoursFromTime();
+  updateShiftAutoSummary();
 });
 
 elements.endInput.addEventListener("input", () => {
-  updateHoursFromTime();
+  updateShiftAutoSummary();
 });
 
-elements.hoursInput.addEventListener("input", () => {
-  hoursEditedManually = true;
+elements.grossAmountInput.addEventListener("input", () => {
+  updateShiftAutoSummary();
 });
 
 elements.rawShiftList.addEventListener("click", (event) => {

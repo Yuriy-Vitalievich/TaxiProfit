@@ -1316,6 +1316,12 @@ h2 {
   gap: 12px;
 }
 
+.quick-shift-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
 .form-actions,
 .row-actions {
   display: flex;
@@ -1335,6 +1341,8 @@ h2 {
 }
 
 .form-grid label,
+.quick-shift-form label,
+.platform-field,
 .import-box {
   display: grid;
   gap: 7px;
@@ -1349,6 +1357,7 @@ h2 {
 
 .form-grid input,
 .form-grid select,
+.quick-shift-form input,
 .import-box input {
   width: 100%;
   min-height: 46px;
@@ -1363,9 +1372,81 @@ h2 {
 
 .form-grid input:focus,
 .form-grid select:focus,
+.quick-shift-form input:focus,
 .import-box input:focus {
   border-color: rgba(40, 242, 156, 0.5);
   box-shadow: 0 0 0 4px rgba(40, 242, 156, 0.1);
+}
+
+.platform-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.platform-options label {
+  display: block;
+  min-width: 0;
+}
+
+.platform-options input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.platform-options span {
+  display: grid;
+  min-height: 46px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--muted);
+  font-weight: 950;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.platform-options input:checked + span {
+  border-color: rgba(40, 242, 156, 0.5);
+  background: rgba(40, 242, 156, 0.14);
+  color: var(--profit);
+  box-shadow: inset 0 0 0 1px rgba(40, 242, 156, 0.14);
+}
+
+.shift-auto-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.shift-auto-summary div {
+  display: grid;
+  gap: 6px;
+  min-height: 78px;
+  align-content: center;
+  padding: 12px;
+  border: 1px solid rgba(40, 242, 156, 0.2);
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, rgba(40, 242, 156, 0.1), rgba(74, 168, 255, 0.06)),
+    rgba(255, 255, 255, 0.045);
+}
+
+.shift-auto-summary span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.shift-auto-summary strong {
+  color: var(--text);
+  font-size: 1.28rem;
+  line-height: 1;
 }
 
 .form-grid select option {
@@ -1700,6 +1781,7 @@ h2 {
   .analytics-grid,
   .data-grid,
   .data-intro,
+  .quick-shift-form,
   .form-grid {
     grid-template-columns: 1fr;
   }
@@ -1850,6 +1932,7 @@ h2 {
 
   .form-grid input,
   .form-grid select,
+  .quick-shift-form input,
   .import-box input,
   .submit-button {
     min-height: 48px;
