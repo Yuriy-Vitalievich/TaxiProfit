@@ -8,6 +8,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HHwwAnF8AfI0IW1CdlROtg_sOjD-Wl_
 const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
 const GOOGLE_SHEETS_WEB_APP_URL = "";
 const REALTIME_REFRESH_DELAY = 500;
+const telegramApp = window.Telegram?.WebApp || null;
 
 const seedShifts = [
   { date: "2026-05-01", weekday: "пт", start: "17:00", end: "22:15", hours: 5, ordersBolt: 0, ordersUklon: 9, ordersCash: 0, grossBolt: 0, grossUklon: 1688.62, grossCash: 0, gross: 1688.62, rent: 0, fuel: 0, other: 0, netValue: 1688.62, km: 57.4, comment: "7 050,10" },
@@ -135,6 +136,7 @@ const elements = {
   expenseSubmit: document.querySelector("#expenseSubmit"),
   cancelExpenseEdit: document.querySelector("#cancelExpenseEdit"),
   clearData: document.querySelector("#clearData"),
+  profileButton: document.querySelector("#profileButton"),
 };
 
 let shifts = loadShifts();
@@ -251,6 +253,81 @@ function hasRealtimeClient() {
 
 function hasSheetsSync() {
   return Boolean(GOOGLE_SHEETS_WEB_APP_URL && window.fetch);
+}
+
+function isTelegramMiniApp() {
+  return Boolean(telegramApp?.initData || telegramApp?.initDataUnsafe?.user);
+}
+
+function setCssVar(name, value) {
+  if (value) document.documentElement.style.setProperty(name, value);
+}
+
+function applyTelegramTheme() {
+  if (!telegramApp) return;
+
+  const theme = telegramApp.themeParams || {};
+  setCssVar("--tg-bg", theme.bg_color);
+  setCssVar("--tg-secondary-bg", theme.secondary_bg_color);
+  setCssVar("--tg-text", theme.text_color);
+  setCssVar("--tg-hint", theme.hint_color);
+  setCssVar("--tg-button", theme.button_color);
+  setCssVar("--tg-button-text", theme.button_text_color);
+
+  document.body.classList.toggle("telegram-mini-app", isTelegramMiniApp());
+  document.body.dataset.telegramPlatform = telegramApp.platform || "";
+  document.body.dataset.telegramColorScheme = telegramApp.colorScheme || "dark";
+}
+
+function updateTelegramViewport() {
+  if (!telegramApp) return;
+
+  const viewportHeight = telegramApp.viewportStableHeight || telegramApp.viewportHeight;
+  if (viewportHeight) document.documentElement.style.setProperty("--tg-viewport-height", `${viewportHeight}px`);
+}
+
+function initialsFromTelegramUser(user) {
+  const nameParts = [user?.first_name, user?.last_name].filter(Boolean);
+  const initials = nameParts.map((part) => part.trim()[0]).join("");
+  if (initials) return initials.slice(0, 2).toUpperCase();
+  return String(user?.username || "TP").slice(0, 2).toUpperCase();
+}
+
+function syncTelegramBackButton(view = location.hash.replace("#", "")) {
+  if (!telegramApp?.BackButton) return;
+
+  if (view === "data") {
+    telegramApp.BackButton.show();
+  } else {
+    telegramApp.BackButton.hide();
+  }
+}
+
+function setupTelegramMiniApp() {
+  if (!telegramApp) return;
+
+  document.documentElement.classList.add("has-telegram-sdk");
+  applyTelegramTheme();
+  updateTelegramViewport();
+
+  const user = telegramApp.initDataUnsafe?.user;
+  if (user && elements.profileButton) {
+    elements.profileButton.textContent = initialsFromTelegramUser(user);
+    elements.profileButton.setAttribute(
+      "aria-label",
+      `Профиль Telegram: ${[user.first_name, user.last_name].filter(Boolean).join(" ") || user.username}`,
+    );
+  }
+
+  telegramApp.ready?.();
+  telegramApp.expand?.();
+  telegramApp.disableVerticalSwipes?.();
+  telegramApp.onEvent?.("themeChanged", applyTelegramTheme);
+  telegramApp.onEvent?.("viewportChanged", updateTelegramViewport);
+  telegramApp.BackButton?.onClick?.(() => {
+    setView("dashboard");
+    history.replaceState(null, "", "#dashboard");
+  });
 }
 
 async function cloudRequest(path, options = {}) {
@@ -1594,6 +1671,7 @@ function setView(view) {
   const nextView = view === "data" ? "data" : "dashboard";
   elements.viewButtons.forEach((item) => item.classList.toggle("active", item.dataset.view === nextView));
   elements.viewPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.viewPanel === nextView));
+  syncTelegramBackButton(nextView);
 }
 
 function updatePeriodControls() {
@@ -1954,6 +2032,7 @@ elements.clearData.addEventListener("click", async () => {
 resetShiftForm();
 resetExpenseForm();
 if (elements.dayPicker) elements.dayPicker.value = selectedDay;
+setupTelegramMiniApp();
 updateDayPickerVisibility();
 setView(location.hash.replace("#", ""));
 renderCsvSyncStatus();
