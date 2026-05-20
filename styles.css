@@ -1177,13 +1177,14 @@ h2 {
 
 .days-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
   gap: 10px;
 }
 
 .day-card {
   display: grid;
   gap: 9px;
+  align-content: start;
   min-height: 118px;
   padding: 13px;
   border: 1px solid var(--line);
@@ -1193,7 +1194,7 @@ h2 {
 
 .day-card div {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 38px;
   align-items: flex-start;
   gap: 8px;
 }
@@ -1206,18 +1207,18 @@ h2 {
 }
 
 .day-card span {
-  padding: 4px 7px;
+  padding: 4px 0;
   border-radius: 999px;
   font-size: 0.68rem;
   font-weight: 900;
   line-height: 1;
   text-align: center;
-  white-space: normal;
-  word-break: break-word;
+  white-space: nowrap;
 }
 
 .day-status {
-  max-width: 72px;
+  width: 38px;
+  min-width: 38px;
 }
 
 .day-card p {
@@ -1794,10 +1795,6 @@ h2 {
   .heatmap {
     grid-template-columns: 30px repeat(5, minmax(38px, 1fr));
     gap: 6px;
-  }
-
-  .days-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .heat-cell {

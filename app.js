@@ -1143,13 +1143,14 @@ function renderDays(summary) {
     .map((record) => {
       const status = record.isWorkday ? "Рабочий" : "Выходной";
       const className = record.isWorkday ? "workday" : "offday";
+      const shortStatus = record.isWorkday ? "Раб." : "Вых.";
       const dayGross = Number(record.gross || 0);
 
       return `
         <article class="day-card ${className}">
           <div>
             <strong>${formatDate(record.date)}</strong>
-            <span class="day-status">${status}</span>
+            <span class="day-status" title="${status}" aria-label="${status}">${shortStatus}</span>
           </div>
           <p>${record.isWorkday ? `${Number(record.hours.toFixed(1))} ч · ${record.orders} заказов` : "смены не было"}</p>
           <b>${money(dayGross)}</b>
