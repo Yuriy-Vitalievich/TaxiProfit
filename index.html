@@ -256,7 +256,7 @@
           <div>
             <span class="section-kicker ai">Источник данных</span>
             <h1>Ввод смен</h1>
-            <p>Пока без интеграций: водитель добавляет смены вручную, а cockpit сразу пересчитывает прибыль, расходы, графики и эффективность.</p>
+            <p>Данные сохраняются в Supabase и синхронизируются между устройствами, а cockpit сразу пересчитывает прибыль, расходы, графики и эффективность.</p>
           </div>
           <div class="data-source-card">
             <span>Хранение</span>
@@ -274,7 +274,6 @@
               </div>
               <div class="form-actions">
                 <button class="ghost-button" type="button" id="cancelShiftEdit" hidden>Отмена</button>
-                <button class="ghost-button" type="button" id="loadDemo">Демо</button>
               </div>
             </div>
 
@@ -425,6 +424,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=day-card-status-1"></script>
+    <script src="app.js?v=remove-demo-1"></script>
   </body>
 </html>

@@ -133,7 +133,6 @@ const elements = {
   expenseSubmit: document.querySelector("#expenseSubmit"),
   cancelExpenseEdit: document.querySelector("#cancelExpenseEdit"),
   clearData: document.querySelector("#clearData"),
-  loadDemo: document.querySelector("#loadDemo"),
 };
 
 let shifts = loadShifts();
@@ -154,13 +153,13 @@ let settingsSaveTimer = null;
 
 function loadShifts() {
   const saved = readStorage();
-  if (!saved) return [...seedShifts];
+  if (!saved) return [];
 
   try {
     const parsed = JSON.parse(saved);
-    return Array.isArray(parsed) ? parsed.map(normalizeShift) : [...seedShifts];
+    return Array.isArray(parsed) ? parsed.map(normalizeShift) : [];
   } catch {
-    return [...seedShifts];
+    return [];
   }
 }
 
@@ -170,13 +169,13 @@ function saveShifts() {
 
 function loadExpenses() {
   const saved = readStorage(EXPENSE_STORAGE_KEY);
-  if (!saved) return [...seedExpenses];
+  if (!saved) return [];
 
   try {
     const parsed = JSON.parse(saved);
-    return Array.isArray(parsed) ? parsed.map(normalizeExpense) : [...seedExpenses];
+    return Array.isArray(parsed) ? parsed.map(normalizeExpense) : [];
   } catch {
-    return [...seedExpenses];
+    return [];
   }
 }
 
@@ -1925,19 +1924,6 @@ elements.clearData.addEventListener("click", async () => {
   shifts = [];
   expenses = [];
   selectedDay = dateKey(new Date());
-  if (elements.dayPicker) elements.dayPicker.value = selectedDay;
-  resetShiftForm();
-  resetExpenseForm();
-  await Promise.all([replaceCloudTable("shifts", shifts), replaceCloudTable("expenses", expenses)]);
-  saveShifts();
-  saveExpenses();
-  renderAll();
-});
-
-elements.loadDemo.addEventListener("click", async () => {
-  shifts = [...seedShifts];
-  expenses = [...seedExpenses];
-  selectedDay = latestDataDate();
   if (elements.dayPicker) elements.dayPicker.value = selectedDay;
   resetShiftForm();
   resetExpenseForm();
