@@ -133,52 +133,6 @@ a {
   box-shadow: inset 0 -10px 22px rgba(0, 0, 0, 0.14);
 }
 
-.range-picker {
-  display: none;
-}
-
-.range-picker.active {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.period-more select,
-.range-picker input {
-  min-height: 38px;
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  padding: 0 12px;
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--text);
-  font: inherit;
-  font-size: 0.82rem;
-  font-weight: 900;
-  outline: none;
-}
-
-.period-more select {
-  width: 134px;
-  appearance: auto;
-}
-
-.range-picker input {
-  width: 142px;
-  border: 1px solid rgba(40, 242, 156, 0.24);
-  background: rgba(40, 242, 156, 0.09);
-}
-
-.range-picker span {
-  color: var(--muted);
-  font-weight: 900;
-}
-
-.period-more select:focus,
-.range-picker input:focus {
-  border-color: rgba(40, 242, 156, 0.5);
-  box-shadow: 0 0 0 4px rgba(40, 242, 156, 0.1);
-}
-
 .period {
   min-height: 38px;
   border-radius: 15px;
@@ -186,6 +140,109 @@ a {
   color: var(--muted);
   font-size: 0.9rem;
   font-weight: 900;
+}
+
+.calendar-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.calendar-trigger {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+
+.calendar-trigger[aria-expanded="true"] {
+  border-color: rgba(40, 242, 156, 0.45);
+  background: rgba(40, 242, 156, 0.12);
+  color: var(--profit);
+}
+
+.calendar-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 12px;
+  width: min(360px, calc(100vw - 24px));
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04)),
+    #20242d;
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.42);
+}
+
+.calendar-popover[hidden] {
+  display: none;
+}
+
+.calendar-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.calendar-presets button {
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.calendar-presets button.active {
+  border-color: rgba(40, 242, 156, 0.35);
+  background: rgba(40, 242, 156, 0.13);
+  color: var(--profit);
+}
+
+.range-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.range-picker label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.range-picker input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid rgba(40, 242, 156, 0.24);
+  border-radius: 12px;
+  padding: 0 10px;
+  background: rgba(40, 242, 156, 0.09);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 900;
+  outline: none;
+}
+
+.range-picker input:focus {
+  border-color: rgba(40, 242, 156, 0.5);
+  box-shadow: 0 0 0 4px rgba(40, 242, 156, 0.1);
 }
 
 .period.active {
@@ -1554,10 +1611,8 @@ h2 {
 
   .top-actions,
   .period-switch,
-  .period-more,
-  .period-more select,
-  .range-picker.active,
-  .range-picker input {
+  .calendar-menu,
+  .calendar-trigger {
     width: 100%;
   }
 
@@ -1594,6 +1649,12 @@ h2 {
     padding: 0 12px;
   }
 
+  .calendar-popover {
+    right: auto;
+    left: 0;
+    width: 100%;
+  }
+
   .period-navigator {
     grid-template-columns: 48px minmax(140px, 1fr) 48px;
     gap: 12px;
@@ -1608,11 +1669,6 @@ h2 {
   .period-current {
     min-width: 0;
     padding: 12px 16px;
-  }
-
-  .range-picker.active {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }
 
   .icon-button,

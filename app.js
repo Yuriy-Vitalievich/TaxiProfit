@@ -61,7 +61,10 @@ const elements = {
   incomeChart: document.querySelector("#incomeChart"),
   heatmap: document.querySelector("#heatmap"),
   periodButtons: document.querySelectorAll("[data-period]"),
-  periodSelect: document.querySelector("#periodSelect"),
+  calendarMenu: document.querySelector("#calendarMenu"),
+  calendarToggle: document.querySelector("#calendarToggle"),
+  calendarPopover: document.querySelector("#calendarPopover"),
+  calendarPresetButtons: document.querySelectorAll("[data-calendar-period]"),
   periodLabel: document.querySelector("#periodLabel"),
   prevPeriod: document.querySelector("#prevPeriod"),
   nextPeriod: document.querySelector("#nextPeriod"),
@@ -1504,19 +1507,30 @@ elements.periodButtons.forEach((button) => {
   });
 });
 
-elements.periodSelect?.addEventListener("change", () => {
-  if (!elements.periodSelect.value) return;
-  activePeriod = elements.periodSelect.value;
-  if (activePeriod === "today") {
-    selectedDay = dateKey(new Date());
-    periodAnchorDate = new Date(`${selectedDay}T12:00`);
-  }
-  if (activePeriod === "yesterday") {
-    selectedDay = dateKey(addDays(new Date(), -1));
-    periodAnchorDate = new Date(`${selectedDay}T12:00`);
-  }
-  updatePeriodControls();
-  renderAll();
+elements.calendarToggle?.addEventListener("click", () => {
+  setCalendarOpen(elements.calendarPopover.hidden);
+});
+
+elements.calendarPresetButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    activePeriod = button.dataset.calendarPeriod;
+    if (activePeriod === "today") {
+      selectedDay = dateKey(new Date());
+      periodAnchorDate = new Date(`${selectedDay}T12:00`);
+    }
+    if (activePeriod === "yesterday") {
+      selectedDay = dateKey(addDays(new Date(), -1));
+      periodAnchorDate = new Date(`${selectedDay}T12:00`);
+    }
+    updatePeriodControls();
+    setCalendarOpen(false);
+    renderAll();
+  });
+});
+
+document.addEventListener("click", (event) => {
+  if (!elements.calendarMenu || elements.calendarMenu.contains(event.target)) return;
+  setCalendarOpen(false);
 });
 
 elements.dayPicker?.addEventListener("change", () => {
@@ -1561,15 +1575,11 @@ function setView(view) {
 }
 
 function updatePeriodControls() {
-  const selectOptions = elements.periodSelect
-    ? [...elements.periodSelect.options].map((option) => option.value)
-    : [];
-  if (elements.periodSelect) {
-    elements.periodSelect.value = selectOptions.includes(activePeriod) ? activePeriod : "";
-  }
   elements.periodButtons.forEach((item) => item.classList.toggle("active", item.dataset.period === activePeriod));
   elements.dayPickerWrap?.classList.toggle("active", activePeriod === "day");
-  elements.rangePickerWrap?.classList.toggle("active", activePeriod === "custom");
+  elements.calendarPresetButtons.forEach((item) => {
+    item.classList.toggle("active", item.dataset.calendarPeriod === activePeriod);
+  });
   if (elements.periodLabel) elements.periodLabel.textContent = periodLabel(activePeriod);
   const canNavigate = ["day", "week", "month", "year"].includes(activePeriod);
   if (elements.prevPeriod) elements.prevPeriod.disabled = !canNavigate;
@@ -1584,6 +1594,12 @@ function updatePeriodControls() {
     elements.rangeEnd.value = customRangeEnd || latestDataDate();
     customRangeEnd = elements.rangeEnd.value;
   }
+}
+
+function setCalendarOpen(isOpen) {
+  if (!elements.calendarPopover || !elements.calendarToggle) return;
+  elements.calendarPopover.hidden = !isOpen;
+  elements.calendarToggle.setAttribute("aria-expanded", String(isOpen));
 }
 
 function shiftVisiblePeriod(direction) {
