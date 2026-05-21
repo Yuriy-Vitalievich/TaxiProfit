@@ -179,7 +179,8 @@ a {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
-  width: min(520px, 44vw);
+  justify-self: center;
+  width: min(560px, 100%);
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -313,7 +314,7 @@ a {
   grid-template-columns: minmax(48px, 1fr) auto minmax(48px, 1fr);
   align-items: center;
   gap: 18px;
-  margin: 2px 0 14px;
+  margin: 0;
 }
 
 .period-arrow {
@@ -522,11 +523,21 @@ a {
   margin-top: 0;
 }
 
+.stats-period-controls {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.stats-period-controls.hidden {
+  display: none;
+}
+
 .screen-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin: 0 0 14px;
+  margin: 0 0 10px;
   padding: 4px;
   width: min(420px, 100%);
   border: 1px solid var(--line);
@@ -1942,19 +1953,16 @@ h2 {
   }
 
   .topbar {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
     gap: 10px;
     padding: 10px 0 12px;
   }
 
-  .top-actions,
-  .period-switch {
-    width: 100%;
-  }
-
   .top-actions {
-    display: block;
+    display: flex;
+    width: auto;
+    margin-left: auto;
   }
 
   .brand-mark {
@@ -1967,6 +1975,7 @@ h2 {
   .period-switch {
     display: flex;
     gap: 5px;
+    width: 100%;
     overflow-x: auto;
     padding: 4px;
     border-radius: 13px;

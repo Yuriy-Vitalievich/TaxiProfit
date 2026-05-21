@@ -1,2 +1,2 @@
-TaxiProfit stats tab rename
-2026-05-21T22:37:32Z
+TaxiProfit scoped statistics period controls
+2026-05-21T22:49:00Z

@@ -63,6 +63,7 @@ const elements = {
   incomeChart: document.querySelector("#incomeChart"),
   heatmap: document.querySelector("#heatmap"),
   periodButtons: document.querySelectorAll("[data-period]"),
+  statsPeriodControls: document.querySelector("#statsPeriodControls"),
   calendarMenu: document.querySelector("#calendarMenu"),
   calendarPopover: document.querySelector("#calendarPopover"),
   calendarPresetButtons: document.querySelectorAll("[data-calendar-period]"),
@@ -1879,6 +1880,8 @@ function setView(view) {
   const nextView = ["data", "history"].includes(view) ? view : "dashboard";
   elements.viewButtons.forEach((item) => item.classList.toggle("active", item.dataset.view === nextView));
   elements.viewPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.viewPanel === nextView));
+  elements.statsPeriodControls?.classList.toggle("hidden", nextView !== "dashboard");
+  if (nextView !== "dashboard") setCalendarOpen(false);
   syncTelegramBackButton(nextView);
 }
 
