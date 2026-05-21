@@ -2,10 +2,10 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TaxiProfit</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=telegram-mini-app-1" />
+    <link rel="stylesheet" href="styles.css?v=telegram-ux-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -65,6 +65,7 @@
       <nav class="screen-tabs" aria-label="Разделы приложения">
         <a class="screen-tab active" href="#dashboard" data-view="dashboard">Cockpit</a>
         <a class="screen-tab" href="#data" data-view="data">Данные</a>
+        <a class="screen-tab" href="#history" data-view="history">История</a>
       </nav>
 
       <main class="dashboard view-panel active" data-view-panel="dashboard">
@@ -253,19 +254,6 @@
       </main>
 
       <main class="data-entry view-panel" data-view-panel="data">
-        <section class="panel data-intro">
-          <div>
-            <span class="section-kicker ai">Источник данных</span>
-            <h1>Ввод смен</h1>
-            <p>Данные сохраняются в Supabase и синхронизируются между устройствами, а cockpit сразу пересчитывает прибыль, расходы, графики и эффективность.</p>
-          </div>
-          <div class="data-source-card">
-            <span>Хранение</span>
-            <strong>Supabase</strong>
-            <p id="syncStatus">Проверяем облако и realtime...</p>
-          </div>
-        </section>
-
         <section class="data-grid">
           <form class="panel shift-form" id="shiftForm">
             <div class="section-head tight">
@@ -279,18 +267,20 @@
             </div>
 
             <div class="quick-shift-form">
-              <label>
-                Дата
-                <input name="date" type="date" required />
-              </label>
-              <label>
-                Вышел на линию
-                <input name="start" type="time" value="17:30" required />
-              </label>
-              <label>
-                Закончил работу
-                <input name="end" type="time" value="23:30" required />
-              </label>
+              <div class="shift-time-row wide-field">
+                <label>
+                  Дата
+                  <input name="date" type="date" required />
+                </label>
+                <label>
+                  Старт
+                  <input name="start" type="time" value="17:30" aria-label="Вышел на линию" required />
+                </label>
+                <label>
+                  Финиш
+                  <input name="end" type="time" value="23:30" aria-label="Закончил работу" required />
+                </label>
+              </div>
 
               <div class="platform-field wide-field">
                 <span>Где заработал</span>
@@ -379,7 +369,20 @@
 
             <button class="submit-button" type="submit" id="expenseSubmit">Добавить расход</button>
           </form>
+        </section>
 
+        <section class="panel data-intro compact-info">
+          <div>
+            <span class="section-kicker ai">Источник данных</span>
+            <h2>Supabase</h2>
+            <p id="syncStatus">Проверяем облако и realtime...</p>
+          </div>
+          <span class="data-source-badge">Realtime</span>
+        </section>
+      </main>
+
+      <main class="history-view view-panel" data-view-panel="history">
+        <section class="history-grid">
           <section class="panel raw-data-panel">
             <div class="section-head tight">
               <div>
@@ -411,6 +414,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=telegram-mini-app-1"></script>
+    <script src="app.js?v=telegram-ux-1"></script>
   </body>
 </html>

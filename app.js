@@ -296,7 +296,7 @@ function initialsFromTelegramUser(user) {
 function syncTelegramBackButton(view = location.hash.replace("#", "")) {
   if (!telegramApp?.BackButton) return;
 
-  if (view === "data") {
+  if (view === "data" || view === "history") {
     telegramApp.BackButton.show();
   } else {
     telegramApp.BackButton.hide();
@@ -328,6 +328,28 @@ function setupTelegramMiniApp() {
     setView("dashboard");
     history.replaceState(null, "", "#dashboard");
   });
+}
+
+function preventAccidentalZoom() {
+  let lastTouchEnd = 0;
+
+  document.addEventListener(
+    "touchend",
+    (event) => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 320) event.preventDefault();
+      lastTouchEnd = now;
+    },
+    { passive: false },
+  );
+
+  document.addEventListener(
+    "gesturestart",
+    (event) => {
+      event.preventDefault();
+    },
+    { passive: false },
+  );
 }
 
 async function cloudRequest(path, options = {}) {
@@ -1668,7 +1690,7 @@ elements.viewButtons.forEach((button) => {
 });
 
 function setView(view) {
-  const nextView = view === "data" ? "data" : "dashboard";
+  const nextView = ["data", "history"].includes(view) ? view : "dashboard";
   elements.viewButtons.forEach((item) => item.classList.toggle("active", item.dataset.view === nextView));
   elements.viewPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.viewPanel === nextView));
   syncTelegramBackButton(nextView);
@@ -2033,6 +2055,7 @@ resetShiftForm();
 resetExpenseForm();
 if (elements.dayPicker) elements.dayPicker.value = selectedDay;
 setupTelegramMiniApp();
+preventAccidentalZoom();
 updateDayPickerVisibility();
 setView(location.hash.replace("#", ""));
 renderCsvSyncStatus();

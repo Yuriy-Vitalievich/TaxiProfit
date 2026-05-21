@@ -27,13 +27,19 @@
 }
 
 html {
+  width: 100%;
+  overflow-x: hidden;
   background: var(--bg);
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
+  width: 100%;
   min-height: 100vh;
+  overflow-x: hidden;
   color: var(--text);
+  touch-action: pan-y;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -45,27 +51,43 @@ body {
 
 body.telegram-mini-app {
   min-height: var(--tg-viewport-height);
-  color: var(--tg-text);
+  color: var(--text);
   background:
-    radial-gradient(circle at 18% 8%, rgba(40, 242, 156, 0.1), transparent 28rem),
-    linear-gradient(145deg, var(--tg-bg) 0%, #0d111b 100%);
+    radial-gradient(circle at 18% 8%, rgba(40, 242, 156, 0.11), transparent 28rem),
+    radial-gradient(circle at 88% 18%, rgba(178, 108, 255, 0.1), transparent 26rem),
+    linear-gradient(145deg, #080a10 0%, #0d111b 100%);
   overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+body.telegram-mini-app input,
+body.telegram-mini-app textarea,
+body.telegram-mini-app select {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+body.telegram-mini-app .app-shell {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 58px);
 }
 
 body.telegram-mini-app .topbar {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--tg-bg) 94%, transparent), transparent);
+  position: relative;
+  top: auto;
+  background: transparent;
 }
 
 body.telegram-mini-app .panel,
 body.telegram-mini-app .glass-card {
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025)),
-    color-mix(in srgb, var(--tg-secondary-bg) 82%, transparent);
+    var(--panel);
 }
 
 body.telegram-mini-app .submit-button {
-  background: var(--tg-button);
-  color: var(--tg-button-text);
+  background: linear-gradient(135deg, var(--profit), var(--blue));
+  color: #06100d;
 }
 
 button,
@@ -384,11 +406,12 @@ a {
 }
 
 .screen-tabs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin: 0 0 14px;
   padding: 4px;
-  width: fit-content;
+  width: min(420px, 100%);
   border: 1px solid var(--line);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.055);
@@ -426,6 +449,10 @@ a {
   gap: 16px;
 }
 
+.history-view {
+  gap: 16px;
+}
+
 .hero-grid,
 .content-grid,
 .analytics-grid,
@@ -448,6 +475,11 @@ a {
 
 .data-grid {
   grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.7fr);
+}
+
+.history-grid {
+  display: grid;
+  gap: 14px;
 }
 
 .glass-card,
@@ -1315,6 +1347,35 @@ h2 {
   align-items: center;
 }
 
+.compact-info {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 14px 16px;
+  box-shadow: none;
+}
+
+.compact-info h2 {
+  margin: 2px 0 0;
+  font-size: 1.2rem;
+}
+
+.compact-info p {
+  margin-top: 5px;
+  font-size: 0.9rem;
+}
+
+.data-source-badge {
+  display: inline-grid;
+  min-height: 34px;
+  place-items: center;
+  padding: 0 12px;
+  border: 1px solid rgba(40, 242, 156, 0.32);
+  border-radius: 999px;
+  background: rgba(40, 242, 156, 0.1);
+  color: var(--profit);
+  font-weight: 950;
+}
+
 .data-intro p,
 .data-source-card p {
   margin: 10px 0 0;
@@ -1352,6 +1413,16 @@ h2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.shift-time-row {
+  display: grid;
+  grid-template-columns: minmax(112px, 1fr) minmax(88px, 0.8fr) minmax(88px, 0.8fr);
+  gap: 10px;
+}
+
+.shift-time-row label {
+  min-width: 0;
 }
 
 .form-actions,
@@ -1392,7 +1463,8 @@ h2 {
 .quick-shift-form input,
 .import-box input {
   width: 100%;
-  min-height: 46px;
+  min-width: 0;
+  min-height: 52px;
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 0 13px;
@@ -1400,6 +1472,13 @@ h2 {
   color: var(--text);
   font: inherit;
   outline: none;
+}
+
+.shift-time-row input {
+  min-height: 58px;
+  padding: 0 10px;
+  font-size: 16px;
+  font-weight: 950;
 }
 
 .form-grid input:focus,
@@ -1702,16 +1781,14 @@ h2 {
   .hero-grid,
   .content-grid,
   .analytics-grid,
-  .data-grid,
-  .data-intro {
+  .data-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .chart-panel,
   .heatmap-panel,
   .days-panel,
-  .shifts-panel,
-  .data-intro {
+  .shifts-panel {
     grid-column: 1 / -1;
   }
 
@@ -1734,6 +1811,13 @@ h2 {
 
   .app-shell {
     padding: 10px;
+  }
+
+  body.telegram-mini-app .app-shell {
+    padding:
+      calc(env(safe-area-inset-top, 0px) + 64px)
+      10px
+      max(14px, env(safe-area-inset-bottom, 0px));
   }
 
   .topbar {
@@ -1813,9 +1897,26 @@ h2 {
   .analytics-grid,
   .data-grid,
   .data-intro,
-  .quick-shift-form,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .quick-shift-form {
+    grid-template-columns: 1fr;
+  }
+
+  .shift-time-row {
+    grid-template-columns: minmax(106px, 1fr) minmax(78px, 0.82fr) minmax(78px, 0.82fr);
+    gap: 8px;
+  }
+
+  .shift-time-row label {
+    gap: 5px;
+    font-size: 0.72rem;
+  }
+
+  .shift-time-row input {
+    min-height: 56px;
   }
 
   .primary-kpi,
@@ -1954,6 +2055,15 @@ h2 {
     align-items: stretch;
   }
 
+  .compact-info {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .data-source-badge {
+    justify-self: start;
+  }
+
   .data-source-card {
     padding: 14px;
   }
@@ -1969,6 +2079,10 @@ h2 {
   .submit-button {
     min-height: 48px;
     font-size: 16px;
+  }
+
+  .shift-time-row input {
+    min-height: 56px;
   }
 
   .raw-list {
@@ -2039,13 +2153,20 @@ h2 {
   .screen-tabs {
     width: 100%;
     position: sticky;
-    top: 86px;
+    top: 8px;
     z-index: 8;
     backdrop-filter: blur(18px);
   }
 
+  body.telegram-mini-app .screen-tabs {
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+  }
+
   .screen-tab {
     width: 100%;
+    min-height: 40px;
+    padding: 0 8px;
+    font-size: 0.9rem;
   }
 }
 
