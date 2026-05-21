@@ -88,6 +88,7 @@ const elements = {
   avgRevenueText: document.querySelector("#avgRevenueText"),
   avgExpenseText: document.querySelector("#avgExpenseText"),
   avgOpsText: document.querySelector("#avgOpsText"),
+  avgKmPriceText: document.querySelector("#avgKmPriceText"),
   profitDelta: document.querySelector("#profitDelta"),
   hourDelta: document.querySelector("#hourDelta"),
   onlineBadge: document.querySelector("#onlineBadge"),
@@ -968,6 +969,7 @@ function periodSummary(period) {
     avgProfit: shiftsWorked ? currentNet / shiftsWorked : 0,
     avgOrders: shiftsWorked ? orders / shiftsWorked : 0,
     avgKm: shiftsWorked ? km / shiftsWorked : 0,
+    avgKmPrice: km ? gross / km : 0,
     fuel,
     rent,
     wash,
@@ -1078,6 +1080,7 @@ function renderMetrics(period) {
   elements.avgRevenueText.textContent = `${money(summary.avgRevenue)} за смену`;
   elements.avgExpenseText.textContent = `${money(summary.avgExpenses)} за смену`;
   elements.avgOpsText.textContent = `${Number(summary.avgOrders.toFixed(1))} заказов · ${Number(summary.avgKm.toFixed(1))} км за смену`;
+  elements.avgKmPriceText.textContent = `${money(summary.avgKmPrice)} за км`;
 
   renderExpenses(summary);
   renderGoal(summary);

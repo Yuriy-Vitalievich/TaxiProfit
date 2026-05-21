@@ -1016,6 +1016,10 @@ h2 {
   box-shadow: inset 3px 0 0 var(--ai);
 }
 
+.tariff {
+  box-shadow: inset 3px 0 0 var(--blue);
+}
+
 .heatmap {
   display: grid;
   grid-template-columns: 32px repeat(5, minmax(34px, 1fr));
