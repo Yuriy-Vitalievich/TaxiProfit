@@ -2073,8 +2073,12 @@ h2 {
   }
 
   .shift-time-row {
-    grid-template-columns: minmax(106px, 1fr) minmax(78px, 0.82fr) minmax(78px, 0.82fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+  }
+
+  .shift-time-row label:first-child {
+    grid-column: 1 / -1;
   }
 
   .runner-platforms {
@@ -2101,6 +2105,8 @@ h2 {
 
   .shift-time-row input {
     min-height: 56px;
+    padding-right: 42px;
+    background-position: right 14px center;
   }
 
   .primary-kpi,
