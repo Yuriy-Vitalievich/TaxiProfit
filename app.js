@@ -2,6 +2,7 @@ const STORAGE_KEY = "taxiProfit.shifts.v3";
 const EXPENSE_STORAGE_KEY = "taxiProfit.expenses.v1";
 const CSV_SYNC_STORAGE_KEY = "taxiProfit.csvSync.v1";
 const GOAL_STORAGE_KEY = "taxiProfit.monthGoal.v1";
+const ACTIVE_SHIFT_STORAGE_KEY = "taxiProfit.activeShift.v1";
 const DEFAULT_MONTH_GOAL = 70000;
 const SUPABASE_URL = "https://aqogfuzhjqbsanaovcox.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HHwwAnF8AfI0IW1CdlROtg_sOjD-Wl_";
@@ -75,6 +76,16 @@ const elements = {
   rangeEnd: document.querySelector("#rangeEnd"),
   viewButtons: document.querySelectorAll("[data-view]"),
   viewPanels: document.querySelectorAll("[data-view-panel]"),
+  shiftRunnerStates: document.querySelectorAll("[data-runner-state]"),
+  runnerPlatformButtons: document.querySelectorAll("[data-run-platform]"),
+  startShiftButton: document.querySelector("#startShiftButton"),
+  finishShiftButton: document.querySelector("#finishShiftButton"),
+  finishShiftForm: document.querySelector("#finishShiftForm"),
+  cancelFinishShift: document.querySelector("#cancelFinishShift"),
+  activePlatform: document.querySelector("#activePlatform"),
+  activeTimer: document.querySelector("#activeTimer"),
+  finishShiftTitle: document.querySelector("#finishShiftTitle"),
+  finishShiftMeta: document.querySelector("#finishShiftMeta"),
   netProfit: document.querySelector("#netProfit"),
   profitFormula: document.querySelector("#profitFormula"),
   shiftCount: document.querySelector("#shiftCount"),
@@ -149,6 +160,10 @@ let customRangeStart = "";
 let customRangeEnd = "";
 let editingShiftIndex = -1;
 let editingExpenseIndex = -1;
+let selectedRunnerPlatform = "Bolt";
+let activeShift = loadActiveShift();
+let pendingShiftFinish = null;
+let activeShiftTimer = null;
 let monthGoal = loadMonthGoal();
 let realtimeClient = null;
 let realtimeReloadTimer = null;
@@ -169,6 +184,32 @@ function loadShifts() {
 
 function saveShifts() {
   writeStorage(JSON.stringify(shifts));
+}
+
+function loadActiveShift() {
+  const saved = readStorage(ACTIVE_SHIFT_STORAGE_KEY);
+  if (!saved) return null;
+
+  try {
+    const parsed = JSON.parse(saved);
+    return parsed?.startedAt && parsed?.platform ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveActiveShift() {
+  if (!activeShift) return;
+  writeStorage(JSON.stringify(activeShift), ACTIVE_SHIFT_STORAGE_KEY);
+}
+
+function clearActiveShift() {
+  activeShift = null;
+  try {
+    localStorage.removeItem(ACTIVE_SHIFT_STORAGE_KEY);
+  } catch {
+    writeStorage("", ACTIVE_SHIFT_STORAGE_KEY);
+  }
 }
 
 function loadExpenses() {
@@ -650,6 +691,11 @@ function money(value) {
   return `₴ ${new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 0 }).format(Math.round(value || 0))}`;
 }
 
+function moneyInputValue(value) {
+  const amount = Number(value || 0);
+  return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
+}
+
 function compactMoney(value) {
   const amount = Number(value || 0);
   if (amount >= 1000) return `₴${Number((amount / 1000).toFixed(1))}k`;
@@ -746,6 +792,32 @@ function calculateHours(start, end) {
 
   const hours = diff / 60;
   return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+}
+
+function formatClockDuration(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
+}
+
+function localDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function localTimeKey(date) {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function runnerElapsedMs(finish = new Date()) {
+  const source = pendingShiftFinish || activeShift;
+  if (!source?.startedAt) return 0;
+  const end = source.endedAt ? new Date(source.endedAt) : finish;
+  return Math.max(0, end - new Date(source.startedAt));
 }
 
 function updateShiftAutoSummary() {
@@ -1398,9 +1470,18 @@ function shiftPlatform(shift) {
 
 function shiftRevenueForPlatform(shift, platform = shiftPlatform(shift)) {
   if (platform === "Bolt") return Number(shift.grossBolt || 0);
-  if (platform === "Indrive") return Number(shift.grossIndrive || shift.grossCash || 0);
+  if (platform === "InDrive" || platform === "Indrive") return Number(shift.grossIndrive || shift.grossCash || 0);
   if (platform === "Uklon") return Number(shift.grossUklon || 0);
   return Number(shift.gross || 0);
+}
+
+function platformValues(platform, amount) {
+  return {
+    grossBolt: platform === "Bolt" ? amount : 0,
+    grossUklon: platform === "Uklon" ? amount : 0,
+    grossCash: platform === "InDrive" || platform === "Indrive" ? amount : 0,
+    grossIndrive: platform === "InDrive" || platform === "Indrive" ? amount : 0,
+  };
 }
 
 function shiftFromForm(formData) {
@@ -1417,10 +1498,7 @@ function shiftFromForm(formData) {
     ordersBolt: 0,
     ordersUklon: 0,
     ordersCash: 0,
-    grossBolt: platform === "Bolt" ? grossAmount : 0,
-    grossUklon: platform === "Uklon" ? grossAmount : 0,
-    grossCash: platform === "Indrive" ? grossAmount : 0,
-    grossIndrive: platform === "Indrive" ? grossAmount : 0,
+    ...platformValues(platform, grossAmount),
     gross: grossAmount,
     fuel: 0,
     rent: 0,
@@ -1437,6 +1515,91 @@ function expenseFromForm(formData) {
     description: formData.get("description"),
     amount: readNumber(formData, "amount"),
     payment: formData.get("payment"),
+    comment: formData.get("comment"),
+  });
+}
+
+function setRunnerState(state) {
+  elements.shiftRunnerStates.forEach((item) => item.classList.toggle("active", item.dataset.runnerState === state));
+}
+
+function updateRunnerPlatformButtons() {
+  elements.runnerPlatformButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.runPlatform === selectedRunnerPlatform);
+  });
+}
+
+function updateActiveShiftTimer() {
+  if (!activeShift || !elements.activeTimer) return;
+  elements.activeTimer.textContent = formatClockDuration(runnerElapsedMs());
+}
+
+function renderShiftRunner() {
+  updateRunnerPlatformButtons();
+  window.clearInterval(activeShiftTimer);
+  activeShiftTimer = null;
+
+  if (pendingShiftFinish) {
+    setRunnerState("finish");
+    if (elements.finishShiftTitle) elements.finishShiftTitle.textContent = `${pendingShiftFinish.platform}: итоги смены`;
+    if (elements.finishShiftMeta) elements.finishShiftMeta.textContent = formatClockDuration(runnerElapsedMs());
+    return;
+  }
+
+  if (activeShift) {
+    selectedRunnerPlatform = activeShift.platform;
+    updateRunnerPlatformButtons();
+    setRunnerState("active");
+    if (elements.activePlatform) elements.activePlatform.textContent = activeShift.platform;
+    updateActiveShiftTimer();
+    activeShiftTimer = window.setInterval(updateActiveShiftTimer, 1000);
+    return;
+  }
+
+  setRunnerState("idle");
+}
+
+function startRunnerShift() {
+  activeShift = {
+    platform: selectedRunnerPlatform,
+    startedAt: new Date().toISOString(),
+  };
+  pendingShiftFinish = null;
+  saveActiveShift();
+  renderShiftRunner();
+}
+
+function finishRunnerShift() {
+  if (!activeShift) return;
+  pendingShiftFinish = {
+    ...activeShift,
+    endedAt: new Date().toISOString(),
+  };
+  elements.finishShiftForm?.reset();
+  renderShiftRunner();
+}
+
+function runnerShiftFromForm(formData) {
+  const started = new Date(pendingShiftFinish.startedAt);
+  const ended = new Date(pendingShiftFinish.endedAt);
+  const gross = readNumber(formData, "gross");
+  const expensesValue = readNumber(formData, "expenses");
+  const orders = readNumber(formData, "orders");
+  const platform = pendingShiftFinish.platform;
+
+  return normalizeShift({
+    date: localDateKey(started),
+    start: localTimeKey(started),
+    end: localTimeKey(ended),
+    hours: Number((runnerElapsedMs(ended) / 3600000).toFixed(1)),
+    platform,
+    ordersBolt: platform === "Bolt" ? orders : 0,
+    ordersUklon: platform === "Uklon" ? orders : 0,
+    ordersCash: platform === "InDrive" || platform === "Indrive" ? orders : 0,
+    ...platformValues(platform, gross),
+    gross,
+    other: expensesValue,
+    km: readNumber(formData, "km"),
     comment: formData.get("comment"),
   });
 }
@@ -1692,6 +1855,26 @@ elements.viewButtons.forEach((button) => {
   });
 });
 
+elements.runnerPlatformButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    selectedRunnerPlatform = button.dataset.runPlatform;
+    updateRunnerPlatformButtons();
+  });
+});
+
+elements.startShiftButton?.addEventListener("click", () => {
+  startRunnerShift();
+});
+
+elements.finishShiftButton?.addEventListener("click", () => {
+  finishRunnerShift();
+});
+
+elements.cancelFinishShift?.addEventListener("click", () => {
+  pendingShiftFinish = null;
+  renderShiftRunner();
+});
+
 function setView(view) {
   const nextView = ["data", "history"].includes(view) ? view : "dashboard";
   elements.viewButtons.forEach((item) => item.classList.toggle("active", item.dataset.view === nextView));
@@ -1899,6 +2082,26 @@ elements.shiftForm.addEventListener("submit", async (event) => {
   renderAll();
 });
 
+elements.finishShiftForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!pendingShiftFinish) return;
+
+  const formData = new FormData(elements.finishShiftForm);
+  let nextShift = runnerShiftFromForm(formData);
+  nextShift = await saveShiftToCloud(nextShift);
+  shifts.push(nextShift);
+  await sendToGoogleSheet("shift", nextShift);
+
+  saveShifts();
+  clearActiveShift();
+  pendingShiftFinish = null;
+  selectedDay = latestDataDate();
+  periodAnchorDate = new Date(`${selectedDay}T12:00`);
+  if (elements.dayPicker) elements.dayPicker.value = selectedDay;
+  renderShiftRunner();
+  renderAll();
+});
+
 elements.csvImport.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
@@ -2056,6 +2259,7 @@ elements.clearData.addEventListener("click", async () => {
 
 resetShiftForm();
 resetExpenseForm();
+renderShiftRunner();
 if (elements.dayPicker) elements.dayPicker.value = selectedDay;
 setupTelegramMiniApp();
 preventAccidentalZoom();

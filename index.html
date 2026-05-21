@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TaxiProfit</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=avg-km-price-1" />
+    <link rel="stylesheet" href="styles.css?v=shift-runner-mvp-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -69,6 +69,70 @@
       </nav>
 
       <main class="dashboard view-panel active" data-view-panel="dashboard">
+        <section class="panel shift-runner" id="shiftRunner">
+          <div class="shift-runner-state active" data-runner-state="idle">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker">Смена</span>
+                <h1>Где сегодня работаешь?</h1>
+              </div>
+            </div>
+            <div class="runner-platforms" aria-label="Выбор платформы">
+              <button class="active" type="button" data-run-platform="Bolt">Bolt</button>
+              <button type="button" data-run-platform="Uklon">Uklon</button>
+              <button type="button" data-run-platform="InDrive">InDrive</button>
+            </div>
+            <button class="submit-button runner-primary" type="button" id="startShiftButton">▶ Начать смену</button>
+          </div>
+
+          <div class="shift-runner-state" data-runner-state="active">
+            <div class="runner-active-head">
+              <div>
+                <span class="section-kicker">Активная смена</span>
+                <h1 id="activePlatform">Bolt</h1>
+              </div>
+              <strong id="activeTimer">00:00:00</strong>
+            </div>
+            <button class="submit-button runner-stop" type="button" id="finishShiftButton">⏹ Завершить смену</button>
+          </div>
+
+          <form class="shift-runner-state runner-finish-form" data-runner-state="finish" id="finishShiftForm">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker">Итоги смены</span>
+                <h1 id="finishShiftTitle">Завершить смену</h1>
+                <p id="finishShiftMeta">00:00:00</p>
+              </div>
+            </div>
+            <div class="finish-grid">
+              <label>
+                Километры
+                <input name="km" type="number" min="0" step="0.1" placeholder="89.4" required />
+              </label>
+              <label>
+                Количество заказов
+                <input name="orders" type="number" min="0" step="1" placeholder="18" required />
+              </label>
+              <label>
+                Выручка, ₴
+                <input name="gross" type="number" min="0" step="0.01" placeholder="3000" required />
+              </label>
+              <label>
+                Расходы, ₴
+                <input name="expenses" type="number" min="0" step="0.01" placeholder="0" />
+              </label>
+              <label class="wide-field">
+                Комментарий
+                <input name="comment" type="text" placeholder="заметка по смене" />
+              </label>
+            </div>
+            <div class="runner-actions">
+              <button class="ghost-button" type="button" id="cancelFinishShift">Назад</button>
+              <button class="submit-button" type="submit">Сохранить смену</button>
+            </div>
+          </form>
+        </section>
+
         <section class="hero-grid" aria-label="Главные показатели">
           <article class="glass-card kpi-card primary-kpi">
             <div class="primary-kpi-copy">
@@ -418,6 +482,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=avg-km-price-1"></script>
+    <script src="app.js?v=shift-runner-mvp-1"></script>
   </body>
 </html>
