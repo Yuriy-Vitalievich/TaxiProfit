@@ -4,6 +4,7 @@ const CSV_SYNC_STORAGE_KEY = "taxiProfit.csvSync.v1";
 const GOAL_STORAGE_KEY = "taxiProfit.weeklyGoal.v1";
 const LEGACY_GOAL_STORAGE_KEY = "taxiProfit.monthGoal.v1";
 const ACTIVE_SHIFT_STORAGE_KEY = "taxiProfit.activeShift.v1";
+const PROFILE_STORAGE_KEY = "taxiProfit.profile.v1";
 const DEFAULT_WEEKLY_GOAL = 10000;
 const SUPABASE_URL = "https://aqogfuzhjqbsanaovcox.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HHwwAnF8AfI0IW1CdlROtg_sOjD-Wl_";
@@ -188,6 +189,15 @@ const elements = {
   cancelExpenseEdit: document.querySelector("#cancelExpenseEdit"),
   clearData: document.querySelector("#clearData"),
   profileButton: document.querySelector("#profileButton"),
+  authForm: document.querySelector("#authForm"),
+  authMessage: document.querySelector("#authMessage"),
+  authStatusTitle: document.querySelector("#authStatusTitle"),
+  authStatusText: document.querySelector("#authStatusText"),
+  signOutButton: document.querySelector("#signOutButton"),
+  profileForm: document.querySelector("#profileForm"),
+  profileTelegramId: document.querySelector("#profileTelegramId"),
+  profileSupabaseId: document.querySelector("#profileSupabaseId"),
+  profileSaveStatus: document.querySelector("#profileSaveStatus"),
 };
 
 let shifts = loadShifts();
@@ -209,6 +219,11 @@ let realtimeReloadTimer = null;
 let cloudLoadedOnce = false;
 let menuTouchStart = null;
 let settingsSaveTimer = null;
+let authClient = null;
+let currentSession = null;
+let currentUser = null;
+let userProfile = loadLocalProfile();
+let authReady = false;
 
 function loadShifts() {
   const saved = readStorage();
@@ -292,6 +307,23 @@ function loadWeeklyGoal() {
 function saveWeeklyGoal(value) {
   weeklyGoal = Number.isFinite(value) && value > 0 ? value : DEFAULT_WEEKLY_GOAL;
   writeStorage(String(weeklyGoal), GOAL_STORAGE_KEY);
+}
+
+function loadLocalProfile() {
+  const saved = readStorage(PROFILE_STORAGE_KEY);
+  if (!saved) return {};
+
+  try {
+    const parsed = JSON.parse(saved);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalProfile(profile) {
+  userProfile = { ...userProfile, ...(profile || {}) };
+  writeStorage(JSON.stringify(userProfile), PROFILE_STORAGE_KEY);
 }
 
 function saveCsvSyncMeta(type, count) {
@@ -380,6 +412,26 @@ function initialsFromTelegramUser(user) {
   return String(user?.username || "TP").slice(0, 2).toUpperCase();
 }
 
+function getTelegramUser() {
+  return telegramApp?.initDataUnsafe?.user || null;
+}
+
+function telegramDisplayName(user = getTelegramUser()) {
+  if (!user) return "";
+  return [user.first_name, user.last_name].filter(Boolean).join(" ") || user.username || "";
+}
+
+function telegramProfilePayload(user = getTelegramUser()) {
+  if (!user) return {};
+
+  return {
+    telegram_id: user.id ? Number(user.id) : null,
+    telegram_username: user.username || "",
+    display_name: telegramDisplayName(user),
+    avatar_url: user.photo_url || "",
+  };
+}
+
 function syncTelegramBackButton(view = location.hash.replace("#", "")) {
   if (!telegramApp?.BackButton) return;
 
@@ -397,7 +449,7 @@ function setupTelegramMiniApp() {
   applyTelegramTheme();
   updateTelegramViewport();
 
-  const user = telegramApp.initDataUnsafe?.user;
+  const user = getTelegramUser();
   if (user && elements.profileButton) {
     const initials = initialsFromTelegramUser(user);
     const displayName = [user.first_name, user.last_name].filter(Boolean).join(" ") || user.username || "TaxiProfit";
@@ -450,13 +502,282 @@ function preventAccidentalZoom() {
   );
 }
 
+function getAuthToken() {
+  return currentSession?.access_token || SUPABASE_PUBLISHABLE_KEY;
+}
+
+function getCurrentUserId() {
+  return currentUser?.id || null;
+}
+
+function createAuthClient() {
+  if (authClient || !hasRealtimeClient()) return authClient;
+
+  authClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: "taxiprofit.supabase.auth",
+    },
+  });
+
+  authClient.auth.onAuthStateChange(async (_event, session) => {
+    currentSession = session;
+    currentUser = session?.user || null;
+    authReady = true;
+    renderProfile();
+    if (currentUser) {
+      await ensureUserProfile();
+      await loadCloudData({ applyEmpty: true, silent: true });
+      await loadCloudSettings();
+      setupRealtimeSync({ includeSettings: true });
+      renderAll();
+    }
+  });
+
+  return authClient;
+}
+
+async function initializeAuth() {
+  const client = createAuthClient();
+  if (!client) {
+    authReady = true;
+    renderProfile();
+    setSyncStatus("Supabase Auth недоступен: работаем локально.");
+    return false;
+  }
+
+  try {
+    const { data } = await client.auth.getSession();
+    currentSession = data?.session || null;
+    currentUser = currentSession?.user || null;
+
+    if (!currentUser) {
+      await signInAnonymously();
+    } else {
+      authReady = true;
+      await ensureUserProfile();
+      renderProfile();
+    }
+    return Boolean(currentUser);
+  } catch (error) {
+    authReady = true;
+    renderProfile();
+    setSyncStatus("Auth не подключился. Проверь настройки Supabase Auth.");
+    console.warn("Supabase Auth unavailable.", error);
+    return false;
+  }
+}
+
+async function signInAnonymously() {
+  const client = createAuthClient();
+  if (!client) return false;
+
+  try {
+    const telegram = telegramProfilePayload();
+    const { data, error } = await client.auth.signInAnonymously({
+      options: {
+        data: {
+          telegram_id: telegram.telegram_id ? String(telegram.telegram_id) : "",
+          telegram_username: telegram.telegram_username || "",
+          display_name: telegram.display_name || "",
+          avatar_url: telegram.avatar_url || "",
+        },
+      },
+    });
+    if (error) throw error;
+    currentSession = data?.session || null;
+    currentUser = data?.user || currentSession?.user || null;
+    authReady = true;
+    await ensureUserProfile();
+    renderProfile();
+    return Boolean(currentUser);
+  } catch (error) {
+    authReady = true;
+    renderProfile();
+    setSyncStatus("Включи Anonymous sign-ins в Supabase Auth или войди через email.");
+    console.warn("Anonymous auth unavailable.", error);
+    return false;
+  }
+}
+
+function profileFromSupabase(row = {}) {
+  return {
+    userId: row.user_id || getCurrentUserId() || "",
+    telegramId: row.telegram_id || "",
+    telegramUsername: row.telegram_username || "",
+    displayName: row.display_name || "",
+    driverName: row.driver_name || "",
+    carModel: row.car_model || "",
+    carNumber: row.car_number || "",
+    defaultPlatform: row.default_platform || "Bolt",
+    phone: row.phone || "",
+    city: row.city || "",
+    avatarUrl: row.avatar_url || "",
+    weeklyGoal: Number(row.weekly_goal || weeklyGoal || DEFAULT_WEEKLY_GOAL),
+  };
+}
+
+function profileToSupabasePayload(profile = userProfile) {
+  const telegram = telegramProfilePayload();
+  return {
+    user_id: getCurrentUserId(),
+    telegram_id: telegram.telegram_id || Number(profile.telegramId || 0) || null,
+    telegram_username: telegram.telegram_username || profile.telegramUsername || "",
+    display_name: profile.displayName || profile.driverName || telegram.display_name || "",
+    driver_name: profile.driverName || profile.displayName || telegram.display_name || "",
+    car_model: profile.carModel || "",
+    car_number: profile.carNumber || "",
+    default_platform: profile.defaultPlatform || selectedRunnerPlatform || "Bolt",
+    phone: profile.phone || "",
+    city: profile.city || "",
+    avatar_url: telegram.avatar_url || profile.avatarUrl || "",
+    weekly_goal: Number(profile.weeklyGoal || weeklyGoal || DEFAULT_WEEKLY_GOAL),
+  };
+}
+
+async function ensureUserProfile() {
+  if (!hasCloudStorage() || !getCurrentUserId()) return false;
+
+  try {
+    const [row] = await cloudRequest("profiles", {
+      query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&select=*&limit=1`,
+    });
+
+    if (row) {
+      saveLocalProfile(profileFromSupabase(row));
+      if (userProfile.defaultPlatform) selectedRunnerPlatform = userProfile.defaultPlatform;
+      if (Number(userProfile.weeklyGoal) > 0) saveWeeklyGoal(Number(userProfile.weeklyGoal));
+      renderProfile();
+      return true;
+    }
+
+    const [created] = await cloudRequest("profiles", {
+      method: "POST",
+      body: profileToSupabasePayload({
+        ...userProfile,
+        weeklyGoal,
+      }),
+    });
+    saveLocalProfile(profileFromSupabase(created));
+    renderProfile();
+    return true;
+  } catch (error) {
+    console.warn("Profile is unavailable, using local profile.", error);
+    renderProfile();
+    return false;
+  }
+}
+
+async function saveUserProfile(profile) {
+  saveLocalProfile(profile);
+  if (profile.defaultPlatform) selectedRunnerPlatform = profile.defaultPlatform;
+  if (Number(profile.weeklyGoal) > 0) {
+    saveWeeklyGoal(Number(profile.weeklyGoal));
+    scheduleSettingsSave();
+  }
+
+  if (!hasCloudStorage() || !getCurrentUserId()) {
+    renderProfile("Профиль сохранен локально.");
+    return false;
+  }
+
+  try {
+    const payload = profileToSupabasePayload(profile);
+    const updated = await cloudRequest("profiles", {
+      method: "PATCH",
+      query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}`,
+      body: payload,
+    });
+    if (Array.isArray(updated) && !updated.length) {
+      await cloudRequest("profiles", {
+        method: "POST",
+        body: payload,
+      });
+    }
+    renderProfile("Профиль сохранен в Supabase.");
+    return true;
+  } catch (error) {
+    console.warn("Profile was saved locally but not synced.", error);
+    renderProfile("Профиль сохранен локально, Supabase пока не принял изменения.");
+    return false;
+  }
+}
+
+function readProfileForm() {
+  if (!elements.profileForm) return {};
+  const data = new FormData(elements.profileForm);
+  return {
+    driverName: String(data.get("driverName") || "").trim(),
+    city: String(data.get("city") || "").trim(),
+    carModel: String(data.get("carModel") || "").trim(),
+    carNumber: String(data.get("carNumber") || "").trim(),
+    defaultPlatform: String(data.get("defaultPlatform") || "Bolt"),
+    phone: String(data.get("phone") || "").trim(),
+    weeklyGoal: Number(data.get("weeklyGoal") || weeklyGoal || DEFAULT_WEEKLY_GOAL),
+  };
+}
+
+function fillProfileForm() {
+  if (!elements.profileForm) return;
+  const profile = { ...userProfile };
+  elements.profileForm.elements.driverName.value = profile.driverName || profile.displayName || telegramDisplayName() || "";
+  elements.profileForm.elements.city.value = profile.city || "";
+  elements.profileForm.elements.carModel.value = profile.carModel || "";
+  elements.profileForm.elements.carNumber.value = profile.carNumber || "";
+  elements.profileForm.elements.defaultPlatform.value = profile.defaultPlatform || selectedRunnerPlatform || "Bolt";
+  elements.profileForm.elements.phone.value = profile.phone || "";
+  elements.profileForm.elements.weeklyGoal.value = Number(profile.weeklyGoal || weeklyGoal || DEFAULT_WEEKLY_GOAL);
+}
+
+function renderProfile(message = "") {
+  const telegramUser = getTelegramUser();
+  const telegram = telegramProfilePayload(telegramUser);
+  const profile = { ...userProfile };
+  const initials = telegramUser ? initialsFromTelegramUser(telegramUser) : initialsFromTelegramUser({ username: profile.driverName || profile.displayName || "TP" });
+  const displayName = profile.driverName || profile.displayName || telegram.display_name || "TaxiProfit";
+  const subtitle = telegram.telegram_username ? `@${telegram.telegram_username}` : currentUser?.email || "Кабинет водителя";
+
+  if (elements.profileButton) elements.profileButton.textContent = initials;
+  if (elements.sideUserAvatar) {
+    elements.sideUserAvatar.textContent = initials;
+    if (telegram.avatar_url || profile.avatarUrl) {
+      elements.sideUserAvatar.style.backgroundImage = `url("${telegram.avatar_url || profile.avatarUrl}")`;
+      elements.sideUserAvatar.textContent = "";
+    }
+  }
+  if (elements.sideUserName) elements.sideUserName.textContent = displayName;
+  if (elements.sideUserSubtitle) elements.sideUserSubtitle.textContent = subtitle;
+  if (elements.profileTelegramId) elements.profileTelegramId.textContent = telegram.telegram_id || profile.telegramId || "не передан";
+  if (elements.profileSupabaseId) elements.profileSupabaseId.textContent = currentUser?.id ? `${currentUser.id.slice(0, 8)}...` : "нет входа";
+
+  if (elements.authStatusTitle) {
+    elements.authStatusTitle.textContent = currentUser
+      ? currentUser.is_anonymous
+        ? "Гость в Supabase"
+        : "Аккаунт подключен"
+      : authReady
+        ? "Вход не выполнен"
+        : "Проверяем вход...";
+  }
+  if (elements.authStatusText) {
+    elements.authStatusText.textContent = currentUser
+      ? "Новые смены, расходы и настройки будут сохраняться с привязкой к этому пользователю."
+      : "Включи Auth в Supabase или войди через email, чтобы данные были персональными.";
+  }
+  if (elements.authMessage && message) elements.authMessage.textContent = message;
+  if (elements.profileSaveStatus && message) elements.profileSaveStatus.textContent = message;
+  fillProfileForm();
+}
+
 async function cloudRequest(path, options = {}) {
   const { method = "GET", body, query = "", prefer = "return=representation" } = options;
   const response = await fetch(`${SUPABASE_REST_URL}/${path}${query}`, {
     method,
     headers: {
       apikey: SUPABASE_PUBLISHABLE_KEY,
-      Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+      Authorization: `Bearer ${getAuthToken()}`,
       "Content-Type": "application/json",
       Prefer: prefer,
     },
@@ -505,11 +826,21 @@ function normalizeCloudExpense(row) {
   return normalizeExpense({ ...(row.payload || {}), remoteId: row.id });
 }
 
+function requireCloudUser() {
+  if (!getCurrentUserId()) {
+    setSyncStatus("Войди в Supabase Auth, чтобы включить персональную синхронизацию.");
+    return false;
+  }
+  return true;
+}
+
 async function loadCloudSettings() {
-  if (!hasCloudStorage()) return false;
+  if (!hasCloudStorage() || !requireCloudUser()) return false;
 
   try {
-    const [settings] = await cloudRequest("settings", { query: "?key=eq.dashboard&select=payload&limit=1" });
+    const [settings] = await cloudRequest("settings", {
+      query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&key=eq.dashboard&select=payload&limit=1`,
+    });
     const payload = settings?.payload || {};
     const legacyGoal = Number(payload.monthGoal);
     const nextGoal = Number.isFinite(Number(payload.weeklyGoal))
@@ -534,10 +865,16 @@ async function loadCloudData({ applyEmpty = false, silent = false } = {}) {
     return false;
   }
 
+  if (!requireCloudUser()) return false;
+
   try {
     const [shiftResult, expenseResult] = await Promise.all([
-      cloudRequest("shifts", { query: "?select=id,payload&order=created_at.asc" }),
-      cloudRequest("expenses", { query: "?select=id,payload&order=created_at.asc" }),
+      cloudRequest("shifts", {
+        query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&select=id,payload&order=created_at.asc`,
+      }),
+      cloudRequest("expenses", {
+        query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&select=id,payload&order=created_at.asc`,
+      }),
     ]);
 
     const cloudShifts = (shiftResult || []).map(normalizeCloudShift);
@@ -587,30 +924,24 @@ function scheduleSettingsReload() {
 }
 
 function setupRealtimeSync({ includeSettings = false } = {}) {
-  if (!hasRealtimeClient()) {
+  if (!hasRealtimeClient() || !getCurrentUserId()) {
     setSyncStatus("Supabase работает через REST. Для realtime нужен supabase-js CDN.");
     return;
   }
 
-  realtimeClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
+  realtimeClient = createAuthClient();
 
   const channel = realtimeClient
-    .channel("taxiprofit-live")
-    .on("postgres_changes", { event: "*", schema: "public", table: "shifts" }, () => {
+    .channel(`taxiprofit-live-${getCurrentUserId()}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "shifts", filter: `user_id=eq.${getCurrentUserId()}` }, () => {
       scheduleCloudReload("Смены обновлены в облаке.");
     })
-    .on("postgres_changes", { event: "*", schema: "public", table: "expenses" }, () => {
+    .on("postgres_changes", { event: "*", schema: "public", table: "expenses", filter: `user_id=eq.${getCurrentUserId()}` }, () => {
       scheduleCloudReload("Расходы обновлены в облаке.");
     });
 
   if (includeSettings) {
-    channel.on("postgres_changes", { event: "*", schema: "public", table: "settings" }, () => {
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "settings", filter: `user_id=eq.${getCurrentUserId()}` }, () => {
       scheduleSettingsReload();
     });
   }
@@ -629,14 +960,23 @@ function setupRealtimeSync({ includeSettings = false } = {}) {
 }
 
 async function saveSettingsToCloud() {
-  if (!hasCloudStorage()) return;
+  if (!hasCloudStorage() || !getCurrentUserId()) return;
 
   try {
+    const [existing] = await cloudRequest("settings", {
+      query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&key=eq.dashboard&select=id&limit=1`,
+    });
+    if (existing?.id) {
+      await cloudRequest("settings", {
+        method: "PATCH",
+        query: `?id=eq.${encodeURIComponent(existing.id)}`,
+        body: { payload: { weeklyGoal }, user_id: getCurrentUserId() },
+      });
+      return;
+    }
     await cloudRequest("settings", {
       method: "POST",
-      query: "?on_conflict=key",
-      body: { key: "dashboard", payload: { weeklyGoal } },
-      prefer: "resolution=merge-duplicates,return=representation",
+      body: { key: "dashboard", user_id: getCurrentUserId(), payload: { weeklyGoal } },
     });
   } catch (error) {
     console.warn("Settings were saved locally but not synced to Supabase.", error);
@@ -651,20 +991,20 @@ function scheduleSettingsSave() {
 }
 
 async function saveShiftToCloud(shift) {
-  if (!hasCloudStorage()) return shift;
+  if (!hasCloudStorage() || !getCurrentUserId()) return shift;
 
   const payload = stripRemoteId(shift);
   try {
     if (shift.remoteId) {
       await cloudRequest("shifts", {
         method: "PATCH",
-        query: `?id=eq.${encodeURIComponent(shift.remoteId)}`,
-        body: { payload },
+        query: `?id=eq.${encodeURIComponent(shift.remoteId)}&user_id=eq.${encodeURIComponent(getCurrentUserId())}`,
+        body: { payload, user_id: getCurrentUserId() },
       });
       return shift;
     }
 
-    const [data] = await cloudRequest("shifts", { method: "POST", body: { payload } });
+    const [data] = await cloudRequest("shifts", { method: "POST", body: { user_id: getCurrentUserId(), payload } });
     return { ...shift, remoteId: data.id };
   } catch (error) {
     console.warn("Shift was saved locally but not synced to Supabase.", error);
@@ -673,20 +1013,20 @@ async function saveShiftToCloud(shift) {
 }
 
 async function saveExpenseToCloud(expense) {
-  if (!hasCloudStorage()) return expense;
+  if (!hasCloudStorage() || !getCurrentUserId()) return expense;
 
   const payload = stripRemoteId(expense);
   try {
     if (expense.remoteId) {
       await cloudRequest("expenses", {
         method: "PATCH",
-        query: `?id=eq.${encodeURIComponent(expense.remoteId)}`,
-        body: { payload },
+        query: `?id=eq.${encodeURIComponent(expense.remoteId)}&user_id=eq.${encodeURIComponent(getCurrentUserId())}`,
+        body: { payload, user_id: getCurrentUserId() },
       });
       return expense;
     }
 
-    const [data] = await cloudRequest("expenses", { method: "POST", body: { payload } });
+    const [data] = await cloudRequest("expenses", { method: "POST", body: { user_id: getCurrentUserId(), payload } });
     return { ...expense, remoteId: data.id };
   } catch (error) {
     console.warn("Expense was saved locally but not synced to Supabase.", error);
@@ -695,12 +1035,12 @@ async function saveExpenseToCloud(expense) {
 }
 
 async function deleteCloudRow(table, remoteId) {
-  if (!hasCloudStorage() || !remoteId) return;
+  if (!hasCloudStorage() || !remoteId || !getCurrentUserId()) return;
 
   try {
     await cloudRequest(table, {
       method: "DELETE",
-      query: `?id=eq.${encodeURIComponent(remoteId)}`,
+      query: `?id=eq.${encodeURIComponent(remoteId)}&user_id=eq.${encodeURIComponent(getCurrentUserId())}`,
       prefer: "return=minimal",
     });
   } catch (error) {
@@ -709,12 +1049,12 @@ async function deleteCloudRow(table, remoteId) {
 }
 
 async function replaceCloudTable(table, items) {
-  if (!hasCloudStorage()) return;
+  if (!hasCloudStorage() || !getCurrentUserId()) return;
 
   try {
     await cloudRequest(table, {
       method: "DELETE",
-      query: "?id=neq.00000000-0000-0000-0000-000000000000",
+      query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}`,
       prefer: "return=minimal",
     });
 
@@ -722,7 +1062,7 @@ async function replaceCloudTable(table, items) {
 
     const data = await cloudRequest(table, {
       method: "POST",
-      body: items.map((item) => ({ payload: stripRemoteId(item) })),
+      body: items.map((item) => ({ user_id: getCurrentUserId(), payload: stripRemoteId(item) })),
     });
 
     data.forEach((row, index) => {
@@ -2257,6 +2597,55 @@ elements.cancelFinishShift?.addEventListener("click", () => {
   renderShiftRunner();
 });
 
+elements.profileButton?.addEventListener("click", () => {
+  setView("profile");
+  history.replaceState(null, "", "#profile");
+});
+
+elements.authForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const client = createAuthClient();
+  const email = String(new FormData(elements.authForm).get("email") || "").trim();
+  if (!client || !email) return;
+
+  try {
+    const telegram = telegramProfilePayload();
+    const { error } = await client.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: location.origin + location.pathname,
+        data: {
+          telegram_id: telegram.telegram_id ? String(telegram.telegram_id) : "",
+          telegram_username: telegram.telegram_username || "",
+          display_name: telegram.display_name || "",
+          avatar_url: telegram.avatar_url || "",
+        },
+      },
+    });
+    if (error) throw error;
+    if (elements.authMessage) elements.authMessage.textContent = "Ссылка для входа отправлена на email.";
+  } catch (error) {
+    if (elements.authMessage) elements.authMessage.textContent = "Не удалось отправить ссылку. Проверь настройки Supabase Auth.";
+    console.warn("Magic link auth failed.", error);
+  }
+});
+
+elements.signOutButton?.addEventListener("click", async () => {
+  const client = createAuthClient();
+  if (!client) return;
+  await client.auth.signOut();
+  currentSession = null;
+  currentUser = null;
+  renderProfile("Вы вышли из Supabase. Данные останутся локально на устройстве.");
+  setSyncStatus("Вход отключен: работаем с локальной копией.");
+});
+
+elements.profileForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await saveUserProfile(readProfileForm());
+  renderAll();
+});
+
 function setView(view) {
   const nextView = ["dashboard", "start", "data", "history", "profile"].includes(view) ? view : "home";
   elements.viewButtons.forEach((item) => item.classList.toggle("active", item.dataset.view === nextView));
@@ -2668,7 +3057,10 @@ updateDayPickerVisibility();
 setView(location.hash.replace("#", ""));
 renderCsvSyncStatus();
 renderAll();
-loadCloudData().then(async (isCloudReady) => {
+initializeAuth().then(async (isSignedIn) => {
+  renderProfile();
+  if (!isSignedIn) return;
+  const isCloudReady = await loadCloudData();
   if (isCloudReady) {
     const hasCloudSettings = await loadCloudSettings();
     setupRealtimeSync({ includeSettings: hasCloudSettings });

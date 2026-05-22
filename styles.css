@@ -918,6 +918,123 @@ body.telegram-mini-app .side-menu {
   line-height: 1.5;
 }
 
+.profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.72fr);
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.profile-card,
+.profile-settings-form {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(40, 242, 156, 0.14), transparent 38%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.035));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.profile-card-label {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--profit);
+  font-size: 0.82rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.profile-card strong {
+  display: block;
+  color: var(--text);
+  font-size: clamp(1.25rem, 3vw, 2rem);
+  font-weight: 950;
+}
+
+.profile-card p,
+.profile-hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.profile-facts {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+}
+
+.profile-facts div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.profile-facts dt {
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.profile-facts dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 950;
+  text-align: right;
+}
+
+.auth-form {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 900;
+}
+
+.auth-form input,
+.profile-form-grid input,
+.profile-form-grid select {
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  font: inherit;
+  font-weight: 900;
+  outline: none;
+}
+
+.auth-form input:focus,
+.profile-form-grid input:focus,
+.profile-form-grid select:focus {
+  border-color: rgba(40, 242, 156, 0.42);
+  box-shadow: 0 0 0 4px rgba(40, 242, 156, 0.1);
+}
+
+.profile-settings-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.profile-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .history-view {
   gap: 16px;
 }
@@ -2457,6 +2574,8 @@ h2 {
   .content-grid,
   .analytics-grid,
   .data-grid,
+  .profile-grid,
+  .profile-form-grid,
   .data-intro,
   .finish-grid,
   .form-grid {
@@ -2670,8 +2789,28 @@ h2 {
     gap: 10px;
   }
 
+  .profile-card,
+  .profile-settings-form {
+    border-radius: 18px;
+    padding: 15px;
+  }
+
+  .profile-facts div {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .profile-facts dd {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    text-align: left;
+  }
+
   .form-grid input,
   .form-grid select,
+  .auth-form input,
+  .profile-form-grid input,
+  .profile-form-grid select,
   .quick-shift-form input,
   .import-box input,
   .submit-button {
