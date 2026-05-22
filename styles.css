@@ -653,6 +653,38 @@ a {
   align-content: start;
 }
 
+.daily-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.daily-breakdown span {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.daily-breakdown small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.daily-breakdown strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .kpi-stack {
   grid-column: 3;
   display: grid;
@@ -2126,6 +2158,10 @@ h2 {
     grid-template-columns: 1fr;
     gap: 14px;
     min-height: auto;
+  }
+
+  .daily-breakdown {
+    grid-template-columns: 1fr;
   }
 
   .glass-card,
