@@ -77,6 +77,10 @@ const elements = {
   rangeEnd: document.querySelector("#rangeEnd"),
   viewButtons: document.querySelectorAll("[data-view]"),
   viewPanels: document.querySelectorAll("[data-view-panel]"),
+  menuToggle: document.querySelector("#menuToggle"),
+  menuClose: document.querySelector("#menuClose"),
+  menuOverlay: document.querySelector("#menuOverlay"),
+  sideMenu: document.querySelector("#sideMenu"),
   shiftRunnerStates: document.querySelectorAll("[data-runner-state]"),
   runnerPlatformButtons: document.querySelectorAll("[data-run-platform]"),
   startShiftButton: document.querySelector("#startShiftButton"),
@@ -1818,7 +1822,9 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") setCalendarOpen(false);
+  if (event.key !== "Escape") return;
+  setCalendarOpen(false);
+  setSideMenuOpen(false);
 });
 
 elements.dayPicker?.addEventListener("change", () => {
@@ -1853,7 +1859,20 @@ elements.nextPeriod?.addEventListener("click", () => {
 elements.viewButtons.forEach((button) => {
   button.addEventListener("click", () => {
     setView(button.dataset.view);
+    setSideMenuOpen(false);
   });
+});
+
+elements.menuToggle?.addEventListener("click", () => {
+  setSideMenuOpen(!elements.sideMenu?.classList.contains("open"));
+});
+
+elements.menuClose?.addEventListener("click", () => {
+  setSideMenuOpen(false);
+});
+
+elements.menuOverlay?.addEventListener("click", () => {
+  setSideMenuOpen(false);
 });
 
 elements.runnerPlatformButtons.forEach((button) => {
@@ -1883,6 +1902,14 @@ function setView(view) {
   elements.statsPeriodControls?.classList.toggle("hidden", nextView !== "dashboard");
   if (nextView !== "dashboard") setCalendarOpen(false);
   syncTelegramBackButton(nextView);
+}
+
+function setSideMenuOpen(isOpen) {
+  if (!elements.sideMenu || !elements.menuOverlay || !elements.menuToggle) return;
+  elements.sideMenu.classList.toggle("open", isOpen);
+  elements.sideMenu.setAttribute("aria-hidden", String(!isOpen));
+  elements.menuToggle.setAttribute("aria-expanded", String(isOpen));
+  elements.menuOverlay.hidden = !isOpen;
 }
 
 function updatePeriodControls() {

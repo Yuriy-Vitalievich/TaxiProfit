@@ -5,18 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TaxiProfit</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=mobile-form-row-1" />
+    <link rel="stylesheet" href="styles.css?v=side-menu-1" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <a class="brand" href="#" aria-label="TaxiProfit dashboard">
+        <button class="brand" type="button" id="menuToggle" aria-label="Открыть меню" aria-controls="sideMenu" aria-expanded="false">
           <span class="brand-mark" aria-hidden="true">🚖</span>
           <span>
             <strong>TaxiProfit</strong>
             <small>driver cockpit</small>
           </span>
-        </a>
+        </button>
 
         <div class="top-actions">
           <button class="icon-button" type="button" aria-label="Настройки">⚙</button>
@@ -24,11 +24,24 @@
         </div>
       </header>
 
-      <nav class="screen-tabs" aria-label="Разделы приложения">
-        <a class="screen-tab active" href="#dashboard" data-view="dashboard">Статистика</a>
-        <a class="screen-tab" href="#data" data-view="data">Данные</a>
-        <a class="screen-tab" href="#history" data-view="history">История</a>
-      </nav>
+      <div class="menu-overlay" id="menuOverlay" hidden></div>
+      <aside class="side-menu" id="sideMenu" aria-label="Меню приложения" aria-hidden="true">
+        <div class="side-menu-head">
+          <div class="brand-static">
+            <span class="brand-mark" aria-hidden="true">🚖</span>
+            <span>
+              <strong>TaxiProfit</strong>
+              <small>driver cockpit</small>
+            </span>
+          </div>
+          <button class="menu-close" type="button" id="menuClose" aria-label="Закрыть меню">×</button>
+        </div>
+        <nav class="screen-tabs" aria-label="Разделы приложения">
+          <a class="screen-tab active" href="#dashboard" data-view="dashboard">Статистика</a>
+          <a class="screen-tab" href="#data" data-view="data">Данные</a>
+          <a class="screen-tab" href="#history" data-view="history">История</a>
+        </nav>
+      </aside>
 
       <div class="stats-period-controls" id="statsPeriodControls" aria-label="Выбор периода статистики">
         <div class="period-switch" role="group" aria-label="Быстрый период">
@@ -421,6 +434,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=mobile-form-row-1"></script>
+    <script src="app.js?v=side-menu-1"></script>
   </body>
 </html>

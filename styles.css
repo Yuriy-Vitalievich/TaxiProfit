@@ -127,8 +127,14 @@ a {
   align-items: center;
   min-width: 0;
   gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: inherit;
+  cursor: pointer;
+  font: inherit;
   text-decoration: none;
+  text-align: left;
 }
 
 .brand-mark {
@@ -173,6 +179,83 @@ a {
   justify-content: flex-end;
   gap: 9px;
   min-width: 0;
+}
+
+.menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(3px);
+}
+
+.menu-overlay[hidden] {
+  display: none;
+}
+
+.side-menu {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 41;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 18px;
+  width: min(320px, calc(100vw - 42px));
+  padding: max(18px, env(safe-area-inset-top, 0px)) 16px max(18px, env(safe-area-inset-bottom, 0px));
+  border-right: 1px solid var(--line);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.035)),
+    #111722;
+  box-shadow: 24px 0 70px rgba(0, 0, 0, 0.46);
+  transform: translateX(-105%);
+  transition: transform 180ms ease;
+}
+
+.side-menu.open {
+  transform: translateX(0);
+}
+
+.side-menu-head,
+.brand-static {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.side-menu-head {
+  justify-content: space-between;
+}
+
+.brand-static strong,
+.brand-static small {
+  display: block;
+}
+
+.brand-static strong {
+  font-size: 1.05rem;
+}
+
+.brand-static small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.menu-close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.065);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .period-switch {
@@ -535,11 +618,12 @@ a {
 
 .screen-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 8px;
-  margin: 0 0 10px;
+  align-content: start;
+  margin: 0;
   padding: 4px;
-  width: min(420px, 100%);
+  width: 100%;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.055);
@@ -547,8 +631,8 @@ a {
 
 .screen-tab {
   display: grid;
-  place-items: center;
-  min-height: 36px;
+  place-items: center start;
+  min-height: 48px;
   padding: 0 16px;
   border: 0;
   border-radius: 12px;
@@ -2338,18 +2422,6 @@ h2 {
 
   .score {
     justify-self: stretch;
-  }
-
-  .screen-tabs {
-    width: 100%;
-    position: sticky;
-    top: 8px;
-    z-index: 8;
-    backdrop-filter: blur(18px);
-  }
-
-  body.telegram-mini-app .screen-tabs {
-    top: calc(env(safe-area-inset-top, 0px) + 8px);
   }
 
   .screen-tab {
