@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TaxiProfit</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=daily-net-1" />
+    <link rel="stylesheet" href="styles.css?v=mobile-form-row-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -76,25 +76,11 @@
           <article class="glass-card kpi-card primary-kpi">
             <div class="primary-kpi-copy">
               <div class="card-topline">
-                <span id="primaryMetricLabel">Сегодня чистыми</span>
+                <span>Чистая прибыль</span>
                 <strong class="profit" id="profitDelta">+12%</strong>
               </div>
               <div class="mega-value" id="netProfit">₴ 42 580</div>
-              <p id="profitFormula">Выручка минус недельная доля расходов</p>
-              <div class="daily-breakdown" aria-label="Расчет чистого дохода">
-                <span>
-                  <small>Выручка</small>
-                  <strong id="todayGrossValue">₴ 0</strong>
-                </span>
-                <span>
-                  <small>Доля расходов</small>
-                  <strong id="todayExpenseShareValue">₴ 0</strong>
-                </span>
-                <span>
-                  <small>Вчера чистыми</small>
-                  <strong id="yesterdayNetValue">₴ 0</strong>
-                </span>
-              </div>
+              <p id="profitFormula">Выручка минус расходы за выбранный период</p>
             </div>
 
             <div class="mini-bars" aria-label="Мини-график дохода за выбранный период">
@@ -435,6 +421,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=daily-net-1"></script>
+    <script src="app.js?v=mobile-form-row-1"></script>
   </body>
 </html>

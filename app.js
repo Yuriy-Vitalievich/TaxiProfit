@@ -87,12 +87,8 @@ const elements = {
   activeTimer: document.querySelector("#activeTimer"),
   finishShiftTitle: document.querySelector("#finishShiftTitle"),
   finishShiftMeta: document.querySelector("#finishShiftMeta"),
-  primaryMetricLabel: document.querySelector("#primaryMetricLabel"),
   netProfit: document.querySelector("#netProfit"),
   profitFormula: document.querySelector("#profitFormula"),
-  todayGrossValue: document.querySelector("#todayGrossValue"),
-  todayExpenseShareValue: document.querySelector("#todayExpenseShareValue"),
-  yesterdayNetValue: document.querySelector("#yesterdayNetValue"),
   shiftCount: document.querySelector("#shiftCount"),
   orderCount: document.querySelector("#orderCount"),
   mileageTotal: document.querySelector("#mileageTotal"),
@@ -158,7 +154,7 @@ const elements = {
 
 let shifts = loadShifts();
 let expenses = loadExpenses();
-let selectedDay = dateKey(new Date());
+let selectedDay = latestDataDate();
 let activePeriod = "day";
 let periodAnchorDate = new Date(`${selectedDay}T12:00`);
 let customRangeStart = "";
@@ -490,6 +486,7 @@ async function loadCloudData({ applyEmpty = false, silent = false } = {}) {
     if (hasCloudRows || applyEmpty || cloudLoadedOnce) {
       shifts = cloudShifts;
       expenses = cloudExpenses;
+      selectedDay = latestDataDate();
       if (elements.dayPicker) elements.dayPicker.value = selectedDay;
       saveShifts();
       saveExpenses();
@@ -1000,113 +997,6 @@ function expenseRange(period) {
   });
 }
 
-function expenseCategoryBucket(category) {
-  if (["Топливо"].includes(category)) return "fuel";
-  if (["Аренда авто", "Аренда"].includes(category)) return "rent";
-  if (["Мойка"].includes(category)) return "wash";
-  if (["Штраф"].includes(category)) return "fine";
-  if (["Ремонт"].includes(category)) return "repair";
-  if (["Комиссии"].includes(category)) return "fees";
-  return "other";
-}
-
-function inclusiveDaysBetween(start, end) {
-  const startDate = new Date(start);
-  const endDate = new Date(end);
-  startDate.setHours(0, 0, 0, 0);
-  endDate.setHours(0, 0, 0, 0);
-  if (endDate < startDate) return 0;
-  return Math.round((endDate - startDate) / 86400000) + 1;
-}
-
-function overlapDays(firstStart, firstEnd, secondStart, secondEnd) {
-  const start = new Date(Math.max(firstStart.getTime(), secondStart.getTime()));
-  const end = new Date(Math.min(firstEnd.getTime(), secondEnd.getTime()));
-  return inclusiveDaysBetween(start, end);
-}
-
-function allocatedExpenseTotals(bounds = null) {
-  const totals = {
-    fuel: 0,
-    rent: 0,
-    wash: 0,
-    fine: 0,
-    repair: 0,
-    fees: 0,
-    other: 0,
-    total: 0,
-  };
-
-  expenses.forEach((expense) => {
-    const amount = Number(expense.amount || 0);
-    if (!amount) return;
-
-    let value = amount;
-    if (bounds) {
-      const paidAt = new Date(`${expense.date}T12:00`);
-      const allocationStart = weekStart(paidAt);
-      const allocationEnd = endOfDay(addDays(allocationStart, 6));
-      const days = overlapDays(bounds.start, bounds.end, allocationStart, allocationEnd);
-      value = days ? (amount / 7) * days : 0;
-    }
-
-    if (!value) return;
-    const bucket = expenseCategoryBucket(expense.category);
-    totals[bucket] += value;
-    totals.total += value;
-  });
-
-  return totals;
-}
-
-function rangeShifts(bounds) {
-  if (!bounds) return shifts;
-  return shifts.filter((shift) => {
-    const value = dateValue(shift);
-    return value >= bounds.start && value <= bounds.end;
-  });
-}
-
-function rangeNet(bounds) {
-  const source = rangeShifts(bounds);
-  const gross = sum(source, "gross");
-  const embeddedExpenses = sum(source, "fuel") + sum(source, "rent") + sum(source, "other") + sum(source, "fees");
-  const allocated = allocatedExpenseTotals(bounds);
-  return gross - embeddedExpenses - allocated.total;
-}
-
-function previousBounds(period) {
-  if (period === "all") return null;
-  const bounds = periodBounds(period);
-
-  if (period === "day") {
-    return dayBounds(dateKey(addDays(bounds.start, -1)));
-  }
-
-  if (period === "week") {
-    const start = addDays(bounds.start, -7);
-    return { start, end: endOfDay(addDays(start, 6)) };
-  }
-
-  if (period === "month") {
-    const start = monthStart(bounds.start);
-    start.setMonth(start.getMonth() - 1);
-    return { start, end: endOfDay(new Date(start.getFullYear(), start.getMonth() + 1, 0)) };
-  }
-
-  if (period === "year") {
-    const start = yearStart(bounds.start);
-    start.setFullYear(start.getFullYear() - 1);
-    return { start, end: endOfDay(new Date(start.getFullYear(), 11, 31)) };
-  }
-
-  const length = inclusiveDaysBetween(bounds.start, bounds.end);
-  const end = endOfDay(addDays(bounds.start, -1));
-  const start = addDays(end, -(length - 1));
-  start.setHours(0, 0, 0, 0);
-  return { start, end };
-}
-
 function percentChange(current, previous) {
   if (!previous) return current ? 100 : 0;
   return Math.round(((current - previous) / previous) * 100);
@@ -1114,8 +1004,7 @@ function percentChange(current, previous) {
 
 function periodSummary(period) {
   const current = currentRange(period);
-  const bounds = period === "all" ? null : periodBounds(period);
-  const allocatedExpenses = allocatedExpenseTotals(bounds);
+  const currentExpenses = expenseRange(period);
   const workedDays = new Set(current.filter(isWorkShift).map((shift) => shift.date).filter(Boolean));
   const calendarDays = dayRecords(period);
   const shiftsWorked = workedDays.size;
@@ -1128,13 +1017,13 @@ function periodSummary(period) {
   const embeddedRent = sum(current, "rent");
   const embeddedOther = sum(current, "other");
   const embeddedFees = sum(current, "fees");
-  const fuel = embeddedFuel + allocatedExpenses.fuel;
-  const rent = embeddedRent + allocatedExpenses.rent;
-  const wash = allocatedExpenses.wash;
-  const fine = allocatedExpenses.fine;
-  const repair = allocatedExpenses.repair;
-  const other = embeddedOther + allocatedExpenses.other;
-  const fees = embeddedFees + allocatedExpenses.fees;
+  const fuel = embeddedFuel + sumExpensesByCategory(currentExpenses, ["Топливо"]);
+  const rent = embeddedRent + sumExpensesByCategory(currentExpenses, ["Аренда авто", "Аренда"]);
+  const wash = sumExpensesByCategory(currentExpenses, ["Мойка"]);
+  const fine = sumExpensesByCategory(currentExpenses, ["Штраф"]);
+  const repair = sumExpensesByCategory(currentExpenses, ["Ремонт"]);
+  const other = embeddedOther + sumExpensesByCategory(currentExpenses, ["Прочее"]);
+  const fees = embeddedFees + sumExpensesByCategory(currentExpenses, ["Комиссии"]);
   const expensesTotal = fuel + rent + wash + fine + repair + fees + other;
   const currentNet = gross - expensesTotal;
 
@@ -1162,7 +1051,6 @@ function periodSummary(period) {
     fees,
     other,
     expenses: expensesTotal,
-    allocatedExpenses: allocatedExpenses.total,
   };
 }
 
@@ -1242,25 +1130,18 @@ function renderChart(period) {
 
 function renderMetrics(period) {
   const summary = periodSummary(period);
-  const previous = previousBounds(period);
-  const previousNet = previous ? rangeNet(previous) : 0;
-  const deltaValue = period === "all" ? 0 : summary.net - previousNet;
+  const previous = shifts.slice(-summary.current.length * 2, -summary.current.length);
+  const previousNet = previous.reduce((total, shift) => total + Number(shift.gross || 0), 0);
+  const delta = period === "all" ? 0 : percentChange(summary.net, previousNet);
   const expenseShare = summary.gross ? Math.round((summary.expenses / summary.gross) * 100) : 0;
-  const isToday = period === "day" && isSameDate(selectedDay, dateKey(new Date()));
 
-  if (elements.primaryMetricLabel) {
-    elements.primaryMetricLabel.textContent = isToday ? "Сегодня чистыми" : "Чистыми за период";
-  }
   elements.netProfit.textContent = money(summary.net);
-  elements.profitFormula.textContent = `${money(summary.gross)} выручка − ${money(summary.expenses)} недельная доля расходов`;
-  if (elements.todayGrossValue) elements.todayGrossValue.textContent = money(summary.gross);
-  if (elements.todayExpenseShareValue) elements.todayExpenseShareValue.textContent = money(summary.expenses);
-  if (elements.yesterdayNetValue) elements.yesterdayNetValue.textContent = money(previousNet);
+  elements.profitFormula.textContent = `${money(summary.gross)} выручка − ${money(summary.expenses)} расходы`;
   elements.shiftCount.textContent = summary.shiftsWorked;
   elements.orderCount.textContent = new Intl.NumberFormat("uk-UA").format(summary.orders);
   elements.mileageTotal.textContent = `${new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 1 }).format(summary.km)} км`;
-  elements.profitDelta.textContent = period === "all" ? "итог" : `${deltaValue >= 0 ? "+" : ""}${money(deltaValue)}`;
-  elements.profitDelta.className = deltaValue >= 0 ? "profit" : "loss";
+  elements.profitDelta.textContent = period === "all" ? "итог" : `${delta >= 0 ? "+" : ""}${delta}%`;
+  elements.profitDelta.className = delta >= 0 ? "profit" : "loss";
   elements.hourDelta.textContent = `${Number(summary.hours.toFixed(1))} ч`;
   elements.onlineBadge.textContent = `${Number(summary.avgOrders.toFixed(1))}/смена`;
   elements.fuelDelta.textContent = `${expenseShare}%`;
@@ -1425,9 +1306,9 @@ function dayRecords(period) {
     record.km += Number(shift.km || 0);
   });
 
-  grouped.forEach((record) => {
-    const bounds = dayBounds(record.date);
-    record.expenses = allocatedExpenseTotals(bounds).total;
+  expenses.forEach((expense) => {
+    if (!grouped.has(expense.date)) return;
+    grouped.get(expense.date).expenses = (grouped.get(expense.date).expenses || 0) + Number(expense.amount || 0);
   });
 
   return [...grouped.values()]
