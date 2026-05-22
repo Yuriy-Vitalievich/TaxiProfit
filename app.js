@@ -173,6 +173,7 @@ let monthGoal = loadMonthGoal();
 let realtimeClient = null;
 let realtimeReloadTimer = null;
 let cloudLoadedOnce = false;
+let menuTouchStart = null;
 let settingsSaveTimer = null;
 
 function loadShifts() {
@@ -1874,6 +1875,52 @@ elements.menuClose?.addEventListener("click", () => {
 elements.menuOverlay?.addEventListener("click", () => {
   setSideMenuOpen(false);
 });
+
+document.addEventListener(
+  "touchstart",
+  (event) => {
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    menuTouchStart = {
+      x: touch.clientX,
+      y: touch.clientY,
+      at: Date.now(),
+      eligible: touch.clientX <= 26 || elements.sideMenu?.classList.contains("open"),
+      handled: false,
+    };
+  },
+  { passive: true },
+);
+
+document.addEventListener(
+  "touchmove",
+  (event) => {
+    if (!menuTouchStart?.eligible) return;
+    const touch = event.touches?.[0];
+    if (!touch) return;
+
+    const dx = touch.clientX - menuTouchStart.x;
+    const dy = touch.clientY - menuTouchStart.y;
+    const isHorizontal = Math.abs(dx) > 44 && Math.abs(dx) > Math.abs(dy) * 1.6;
+    if (!isHorizontal) return;
+
+    const isOpen = elements.sideMenu?.classList.contains("open");
+    if (!isOpen && dx > 64) {
+      event.preventDefault();
+      menuTouchStart.handled = true;
+      setSideMenuOpen(true);
+    }
+  },
+  { passive: false },
+);
+
+document.addEventListener(
+  "touchend",
+  () => {
+    menuTouchStart = null;
+  },
+  { passive: true },
+);
 
 elements.runnerPlatformButtons.forEach((button) => {
   button.addEventListener("click", () => {
