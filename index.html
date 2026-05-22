@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TaxiProfit</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=telegram-dashboard-fixes-1" />
+    <link rel="stylesheet" href="styles.css?v=side-menu-polish-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -37,12 +37,43 @@
           <button class="menu-close" type="button" id="menuClose" aria-label="Закрыть меню">×</button>
         </div>
         <nav class="screen-tabs" aria-label="Разделы приложения">
-          <a class="screen-tab active" href="#home" data-view="home">Главная</a>
-          <a class="screen-tab" href="#dashboard" data-view="dashboard">Статистика</a>
-          <a class="screen-tab" href="#start" data-view="start">Начать смену</a>
-          <a class="screen-tab" href="#data" data-view="data">Данные</a>
-          <a class="screen-tab" href="#history" data-view="history">История</a>
+          <div class="side-main-links">
+            <a class="screen-tab side-primary active" href="#home" data-view="home">
+              <span class="side-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/></svg>
+              </span>
+              <span>Главная</span>
+            </a>
+            <a class="screen-tab side-primary" href="#dashboard" data-view="dashboard">
+              <span class="side-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16v-5"/><path d="M12 16V8"/><path d="M16 16v-7"/></svg>
+              </span>
+              <span>Статистика</span>
+            </a>
+            <a class="screen-tab side-primary" href="#start" data-view="start">
+              <span class="side-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M6 12h12"/><path d="m13 7 5 5-5 5"/><path d="M5 5v14"/></svg>
+              </span>
+              <span>Начать смену</span>
+            </a>
+          </div>
+
+          <div class="side-secondary-links" aria-label="Дополнительно">
+            <span class="side-section-label">Журнал</span>
+            <a class="screen-tab side-secondary" href="#data" data-view="data">Данные</a>
+            <a class="screen-tab side-secondary" href="#history" data-view="history">История</a>
+          </div>
         </nav>
+        <div class="side-user-card">
+          <span class="side-user-avatar" id="sideUserAvatar" aria-hidden="true">АК</span>
+          <span class="side-user-copy">
+            <strong id="sideUserName">TaxiProfit</strong>
+            <small id="sideUserSubtitle">Кабинет водителя</small>
+          </span>
+          <button class="side-user-settings" type="button" data-view="profile" aria-label="Открыть кабинет">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19 13.5v-3l-2.1-.35a6.7 6.7 0 0 0-.68-1.64L17.45 6.8 15.3 4.65 13.6 5.88a6.7 6.7 0 0 0-1.6-.66L11.5 3h-3l-.35 2.1a6.7 6.7 0 0 0-1.64.68L4.8 4.55 2.65 6.7 3.88 8.4a6.7 6.7 0 0 0-.66 1.6L1 10.5v3l2.1.35c.16.58.39 1.13.68 1.64L2.55 17.2l2.15 2.15 1.7-1.23c.5.28 1.04.51 1.6.66l.5 2.22h3l.35-2.1c.58-.16 1.13-.39 1.64-.68l1.71 1.23 2.15-2.15-1.23-1.7c.28-.5.51-1.04.66-1.6z"/></svg>
+          </button>
+        </div>
       </aside>
 
       <div class="stats-period-controls hidden" id="statsPeriodControls" aria-label="Выбор периода статистики">
@@ -100,6 +131,10 @@
               <button type="button" data-run-platform="Uklon">Uklon</button>
               <button type="button" data-run-platform="InDrive">InDrive</button>
             </div>
+            <label class="runner-field">
+              Пробег на авто сейчас
+              <input id="startOdometer" type="number" min="0" step="0.1" inputmode="decimal" placeholder="125430.5" required />
+            </label>
             <button class="submit-button runner-primary" type="button" id="startShiftButton">▶ Начать смену</button>
           </div>
 
@@ -108,10 +143,14 @@
               <div>
                 <span class="section-kicker">Активная смена</span>
                 <h1 id="activePlatform">Bolt</h1>
+                <p id="activeShiftMeta">Старт зафиксирован</p>
               </div>
               <strong id="activeTimer">00:00:00</strong>
             </div>
-            <button class="submit-button runner-stop" type="button" id="finishShiftButton">⏹ Завершить смену</button>
+            <div class="runner-live-actions">
+              <button class="ghost-button runner-cancel" type="button" id="cancelActiveShiftButton">Отменить смену</button>
+              <button class="submit-button runner-stop" type="button" id="finishShiftButton">⏹ Завершить смену</button>
+            </div>
           </div>
 
           <form class="shift-runner-state runner-finish-form" data-runner-state="finish" id="finishShiftForm">
@@ -124,8 +163,12 @@
             </div>
             <div class="finish-grid">
               <label>
-                Километры
+                Км по заказам
                 <input name="km" type="number" min="0" step="0.1" placeholder="89.4" required />
+              </label>
+              <label>
+                Пробег после смены
+                <input name="odometerEnd" type="number" min="0" step="0.1" placeholder="125520.0" required />
               </label>
               <label>
                 Количество заказов
@@ -609,9 +652,21 @@
           </section>
         </section>
       </main>
+
+      <main class="profile-view view-panel" data-view-panel="profile">
+        <section class="panel profile-panel">
+          <div class="section-head tight">
+            <div>
+              <span class="section-kicker">Кабинет</span>
+              <h1>Профиль водителя</h1>
+            </div>
+          </div>
+          <p class="profile-note">Здесь позже будут настройки аккаунта, синхронизации и персональные цели.</p>
+        </section>
+      </main>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=telegram-dashboard-fixes-1"></script>
+    <script src="app.js?v=side-menu-polish-1"></script>
   </body>
 </html>

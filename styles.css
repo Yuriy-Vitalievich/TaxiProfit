@@ -210,15 +210,18 @@ a {
   left: 0;
   z-index: 41;
   display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 18px;
+  grid-template-rows: auto 1fr auto;
+  gap: 20px;
   width: min(320px, calc(100vw - 42px));
   padding: max(18px, env(safe-area-inset-top, 0px)) 16px max(18px, env(safe-area-inset-bottom, 0px));
-  border-right: 1px solid var(--line);
+  border-right: 1px solid rgba(40, 242, 156, 0.16);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.035)),
-    #111722;
+    radial-gradient(circle at 12% 8%, rgba(40, 242, 156, 0.14), transparent 15rem),
+    radial-gradient(circle at 86% 18%, rgba(178, 108, 255, 0.12), transparent 16rem),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.032)),
+    rgba(17, 23, 34, 0.94);
   box-shadow: 24px 0 70px rgba(0, 0, 0, 0.46);
+  backdrop-filter: blur(22px);
   overflow-y: auto;
   overscroll-behavior: contain;
   transform: translateX(-105%);
@@ -555,9 +558,50 @@ body.telegram-mini-app .side-menu {
   box-shadow: inset 0 0 0 1px rgba(40, 242, 156, 0.14);
 }
 
+.runner-field {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.runner-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0 13px;
+  background: rgba(255, 255, 255, 0.065);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+
+.runner-field input:focus {
+  border-color: rgba(40, 242, 156, 0.5);
+  box-shadow: 0 0 0 4px rgba(40, 242, 156, 0.1);
+}
+
 .runner-primary,
 .runner-stop {
   margin-top: 0;
+}
+
+.runner-live-actions {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.34fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.runner-live-actions .submit-button {
+  margin-top: 0;
+}
+
+.runner-cancel {
+  border-color: rgba(255, 95, 122, 0.24);
+  color: var(--loss);
 }
 
 .runner-stop {
@@ -640,21 +684,31 @@ body.telegram-mini-app .side-menu {
 .screen-tabs {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 8px;
+  gap: 18px;
   align-content: start;
   margin: 0;
-  padding: 4px;
+  padding: 0;
   width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.055);
+  border: 0;
+  background: transparent;
+}
+
+.side-main-links,
+.side-secondary-links {
+  display: grid;
+  gap: 8px;
+}
+
+.side-secondary-links {
+  padding-top: 16px;
+  border-top: 1px solid rgba(40, 242, 156, 0.12);
 }
 
 .screen-tab {
-  display: grid;
-  place-items: center start;
+  display: flex;
+  align-items: center;
   min-height: 48px;
-  padding: 0 16px;
+  padding: 0 14px;
   border: 0;
   border-radius: 12px;
   background: transparent;
@@ -665,9 +719,133 @@ body.telegram-mini-app .side-menu {
 }
 
 .screen-tab.active {
-  background: rgba(178, 108, 255, 0.18);
+  border: 1px solid rgba(40, 242, 156, 0.24);
+  background:
+    linear-gradient(135deg, rgba(40, 242, 156, 0.16), rgba(74, 168, 255, 0.08)),
+    rgba(255, 255, 255, 0.055);
+  color: var(--text);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035),
+    0 14px 30px rgba(40, 242, 156, 0.08);
+}
+
+.side-primary {
+  gap: 12px;
+  min-height: 56px;
+  font-size: 1rem;
+}
+
+.side-secondary {
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+}
+
+.side-secondary.active {
+  border: 0;
+  background: rgba(178, 108, 255, 0.12);
   color: #dec7ff;
-  box-shadow: inset 0 0 0 1px rgba(178, 108, 255, 0.22);
+  box-shadow: inset 3px 0 0 rgba(178, 108, 255, 0.7);
+}
+
+.side-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  color: var(--muted);
+}
+
+.side-icon svg,
+.side-user-settings svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
+
+.screen-tab.active .side-icon {
+  color: var(--profit);
+}
+
+.side-section-label {
+  padding: 0 10px 4px;
+  color: rgba(141, 153, 173, 0.72);
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.side-user-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(40, 242, 156, 0.12);
+}
+
+.side-user-avatar {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  overflow: hidden;
+  border-radius: 50%;
+  background:
+    linear-gradient(135deg, rgba(40, 242, 156, 0.86), rgba(74, 168, 255, 0.9));
+  color: #06100d;
+  font-weight: 950;
+  background-position: center;
+  background-size: cover;
+}
+
+.side-user-copy {
+  min-width: 0;
+}
+
+.side-user-copy strong,
+.side-user-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-user-copy strong {
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.side-user-copy small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.side-user-settings {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+}
+
+.side-user-settings:hover {
+  border-color: rgba(40, 242, 156, 0.28);
+  color: var(--profit);
+  background: rgba(40, 242, 156, 0.12);
 }
 
 .side-shift-runner {
@@ -722,6 +900,22 @@ body.telegram-mini-app .side-menu {
 
 .data-entry {
   gap: 16px;
+}
+
+.profile-view {
+  gap: 16px;
+}
+
+.profile-panel h1 {
+  margin: 4px 0 0;
+  font-size: clamp(1.85rem, 4vw, 2.7rem);
+}
+
+.profile-note {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.5;
 }
 
 .history-view {
@@ -2296,6 +2490,10 @@ h2 {
   }
 
   .runner-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .runner-live-actions {
     grid-template-columns: 1fr;
   }
 
