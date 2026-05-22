@@ -1172,6 +1172,7 @@ function percentChange(current, previous) {
 
 function periodSummary(period) {
   const current = currentRange(period);
+  const currentExpenses = expenseRange(period);
   const bounds = period === "all" ? null : periodBounds(period);
   const allocatedExpenses = allocatedExpenseTotals(bounds);
   const effectiveFinancials = periodFinancials(bounds);
@@ -1196,6 +1197,14 @@ function periodSummary(period) {
   const fees = effectiveFinancials ? effectiveFinancials.fees : embeddedFees + allocatedExpenses.fees;
   const expensesTotal = fuel + rent + wash + fine + repair + fees + other;
   const currentNet = effectiveFinancials ? effectiveFinancials.net : gross - expensesTotal;
+  const paidFuel = sumExpensesByCategory(currentExpenses, ["Топливо"]);
+  const paidRent = sumExpensesByCategory(currentExpenses, ["Аренда авто", "Аренда"]);
+  const paidWash = sumExpensesByCategory(currentExpenses, ["Мойка"]);
+  const paidFine = sumExpensesByCategory(currentExpenses, ["Штраф"]);
+  const paidRepair = sumExpensesByCategory(currentExpenses, ["Ремонт"]);
+  const paidFees = sumExpensesByCategory(currentExpenses, ["Комиссии"]);
+  const paidOther = sumExpensesByCategory(currentExpenses, ["Прочее", "Прочие"]);
+  const paidExpensesTotal = paidFuel + paidRent + paidWash + paidFine + paidRepair + paidFees + paidOther;
 
   return {
     current,
@@ -1222,6 +1231,14 @@ function periodSummary(period) {
     other,
     expenses: expensesTotal,
     allocatedExpenses: allocatedExpenses.total,
+    paidExpenses: paidExpensesTotal,
+    paidFuel,
+    paidRent,
+    paidWash,
+    paidFine,
+    paidRepair,
+    paidFees,
+    paidOther,
   };
 }
 
@@ -1391,13 +1408,13 @@ function selectMiniRecords(records, maxItems) {
 }
 
 function renderExpenses(summary) {
-  elements.totalExpenses.textContent = money(summary.expenses);
-  elements.fuelExpense.textContent = money(summary.fuel);
-  elements.rentExpense.textContent = money(summary.rent);
-  elements.washExpense.textContent = money(summary.wash);
-  elements.fineExpense.textContent = money(summary.fine);
-  elements.repairExpense.textContent = money(summary.repair);
-  elements.otherExpense.textContent = money(summary.other + summary.fees);
+  elements.totalExpenses.textContent = money(summary.paidExpenses);
+  elements.fuelExpense.textContent = money(summary.paidFuel);
+  elements.rentExpense.textContent = money(summary.paidRent);
+  elements.washExpense.textContent = money(summary.paidWash);
+  elements.fineExpense.textContent = money(summary.paidFine);
+  elements.repairExpense.textContent = money(summary.paidRepair);
+  elements.otherExpense.textContent = money(summary.paidOther + summary.paidFees);
 }
 
 function renderGoal(summary) {
