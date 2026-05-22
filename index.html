@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TaxiProfit</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=side-menu-polish-1" />
+    <link rel="stylesheet" href="styles.css?v=auth-profile-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -661,12 +661,87 @@
               <h1>Профиль водителя</h1>
             </div>
           </div>
-          <p class="profile-note">Здесь позже будут настройки аккаунта, синхронизации и персональные цели.</p>
+
+          <div class="profile-grid">
+            <article class="profile-card auth-card">
+              <span class="profile-card-label">Аккаунт</span>
+              <strong id="authStatusTitle">Проверяем вход...</strong>
+              <p id="authStatusText">Подключаем Supabase Auth и Telegram-профиль.</p>
+              <dl class="profile-facts">
+                <div>
+                  <dt>Telegram ID</dt>
+                  <dd id="profileTelegramId">не передан</dd>
+                </div>
+                <div>
+                  <dt>Supabase user</dt>
+                  <dd id="profileSupabaseId">ожидаем</dd>
+                </div>
+              </dl>
+            </article>
+
+            <form class="profile-card auth-form" id="authForm">
+              <span class="profile-card-label">Вход</span>
+              <label>
+                Email для входа
+                <input name="email" type="email" autocomplete="email" placeholder="you@example.com" />
+              </label>
+              <button class="ghost-button" type="submit">Получить ссылку</button>
+              <button class="ghost-button danger" type="button" id="signOutButton">Выйти</button>
+              <p id="authMessage" class="profile-hint">Можно работать через Telegram ID, а email позже привяжет данные к постоянному аккаунту.</p>
+            </form>
+          </div>
+
+          <form class="profile-settings-form" id="profileForm">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker ai">Данные водителя</span>
+                <h2>Рабочий профиль</h2>
+              </div>
+            </div>
+
+            <div class="form-grid profile-form-grid">
+              <label>
+                Имя водителя
+                <input name="driverName" type="text" autocomplete="name" placeholder="Юрий" />
+              </label>
+              <label>
+                Город
+                <input name="city" type="text" placeholder="Киев" />
+              </label>
+              <label>
+                Автомобиль
+                <input name="carModel" type="text" placeholder="Toyota Prius" />
+              </label>
+              <label>
+                Номер авто
+                <input name="carNumber" type="text" placeholder="AA 0000 AA" />
+              </label>
+              <label>
+                Основная платформа
+                <select name="defaultPlatform">
+                  <option value="Bolt">Bolt</option>
+                  <option value="Uklon">Uklon</option>
+                  <option value="InDrive">InDrive</option>
+                </select>
+              </label>
+              <label>
+                Телефон
+                <input name="phone" type="tel" autocomplete="tel" placeholder="+380..." />
+              </label>
+              <label class="wide-field">
+                Недельная цель, ₴
+                <input name="weeklyGoal" type="number" min="1" step="500" placeholder="10000" />
+              </label>
+            </div>
+
+            <button class="submit-button" type="submit">Сохранить кабинет</button>
+            <p class="profile-note" id="profileSaveStatus">Профиль будет храниться в Supabase и использоваться для привязки данных к пользователю.</p>
+          </form>
         </section>
       </main>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=side-menu-polish-1"></script>
+    <script src="app.js?v=auth-profile-1"></script>
   </body>
 </html>
