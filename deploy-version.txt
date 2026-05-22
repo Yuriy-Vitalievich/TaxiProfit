@@ -9,3 +9,11 @@ TaxiProfit restore statistics dashboard
 2026-05-22T09:50:00Z
 TaxiProfit telegram dashboard fixes
 2026-05-22T10:05:00Z
+TaxiProfit shift odometer heatmap
+2026-05-23T00:00:00Z
+TaxiProfit shift cancel action
+2026-05-23T00:55:00Z
+TaxiProfit side menu redesign
+2026-05-23T01:10:00Z
+TaxiProfit side menu visual polish
+2026-05-23T01:25:00Z

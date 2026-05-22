@@ -58,7 +58,7 @@ const seedExpenses = [
 
 const weekdayLabels = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const heatRows = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-const heatHours = ["08", "12", "16", "20", "23"];
+const heatHours = ["00", "08", "12", "16", "20"];
 
 const elements = {
   incomeChart: document.querySelector("#incomeChart"),
@@ -82,14 +82,20 @@ const elements = {
   menuClose: document.querySelector("#menuClose"),
   menuOverlay: document.querySelector("#menuOverlay"),
   sideMenu: document.querySelector("#sideMenu"),
+  sideUserAvatar: document.querySelector("#sideUserAvatar"),
+  sideUserName: document.querySelector("#sideUserName"),
+  sideUserSubtitle: document.querySelector("#sideUserSubtitle"),
   shiftRunnerStates: document.querySelectorAll("[data-runner-state]"),
   runnerPlatformButtons: document.querySelectorAll("[data-run-platform]"),
   startShiftButton: document.querySelector("#startShiftButton"),
   finishShiftButton: document.querySelector("#finishShiftButton"),
+  cancelActiveShiftButton: document.querySelector("#cancelActiveShiftButton"),
   finishShiftForm: document.querySelector("#finishShiftForm"),
   cancelFinishShift: document.querySelector("#cancelFinishShift"),
+  startOdometer: document.querySelector("#startOdometer"),
   activePlatform: document.querySelector("#activePlatform"),
   activeTimer: document.querySelector("#activeTimer"),
+  activeShiftMeta: document.querySelector("#activeShiftMeta"),
   finishShiftTitle: document.querySelector("#finishShiftTitle"),
   finishShiftMeta: document.querySelector("#finishShiftMeta"),
   homeNetProfit: document.querySelector("#homeNetProfit"),
@@ -393,11 +399,22 @@ function setupTelegramMiniApp() {
 
   const user = telegramApp.initDataUnsafe?.user;
   if (user && elements.profileButton) {
-    elements.profileButton.textContent = initialsFromTelegramUser(user);
+    const initials = initialsFromTelegramUser(user);
+    const displayName = [user.first_name, user.last_name].filter(Boolean).join(" ") || user.username || "TaxiProfit";
+    elements.profileButton.textContent = initials;
     elements.profileButton.setAttribute(
       "aria-label",
-      `Профиль Telegram: ${[user.first_name, user.last_name].filter(Boolean).join(" ") || user.username}`,
+      `Профиль Telegram: ${displayName}`,
     );
+    if (elements.sideUserAvatar) {
+      elements.sideUserAvatar.textContent = initials;
+      if (user.photo_url) {
+        elements.sideUserAvatar.style.backgroundImage = `url("${user.photo_url}")`;
+        elements.sideUserAvatar.textContent = "";
+      }
+    }
+    if (elements.sideUserName) elements.sideUserName.textContent = displayName;
+    if (elements.sideUserSubtitle) elements.sideUserSubtitle.textContent = user.username ? `@${user.username}` : "Кабинет водителя";
   }
 
   telegramApp.ready?.();
@@ -792,6 +809,10 @@ function normalizeShift(shift) {
     fees: Number(shift.fees || 0),
     hours: Number(shift.hours || 0),
     km: Number(shift.km || 0),
+    odometerStart: Number(shift.odometerStart || 0),
+    odometerEnd: Number(shift.odometerEnd || 0),
+    totalKm: Number(shift.totalKm || 0),
+    extraKm: Number(shift.extraKm || 0),
     ordersBolt: Number(shift.ordersBolt || 0),
     ordersUklon: Number(shift.ordersUklon || 0),
     ordersCash: Number(shift.ordersCash || 0),
@@ -817,6 +838,25 @@ function normalizeExpense(expense) {
 
 function dateValue(shift) {
   return new Date(`${shift.date}T${normalizeTime(shift.start || "12:00")}`);
+}
+
+function shiftStartDateTime(shift) {
+  return new Date(`${shift.date}T${normalizeTime(shift.start || "12:00")}`);
+}
+
+function shiftEndDateTime(shift) {
+  const start = shiftStartDateTime(shift);
+  const end = new Date(`${shift.date}T${normalizeTime(shift.end || shift.start || "12:00")}`);
+  if (end < start) end.setDate(end.getDate() + 1);
+  return end;
+}
+
+function heatSlotIndex(hour) {
+  if (hour < 8) return 0;
+  if (hour < 12) return 1;
+  if (hour < 16) return 2;
+  if (hour < 20) return 3;
+  return 4;
 }
 
 function normalizeTime(value) {
@@ -862,6 +902,17 @@ function localDateKey(date) {
 
 function localTimeKey(date) {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatDateTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "время не зафиксировано";
+  return date.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function runnerElapsedMs(finish = new Date()) {
@@ -1573,11 +1624,21 @@ function renderHeatmap() {
 
   source.forEach((shift) => {
     if (!isWorkShift(shift)) return;
-    const day = weekdayLabels[dateValue(shift).getDay()];
-    const hour = Number(normalizeTime(shift.start || "12:00").slice(0, 2));
-    const rowIndex = heatRows.indexOf(day);
-    const colIndex = Math.min(heatHours.length - 1, Math.max(0, Math.floor((hour - 8) / 4)));
-    if (rowIndex >= 0) grid[rowIndex][colIndex].value += net(shift) / Math.max(shift.hours, 1);
+    const start = shiftStartDateTime(shift);
+    const end = shiftEndDateTime(shift);
+    const hourlyGross = Number(shift.gross || 0) / Math.max(Number(shift.hours || 0), 1);
+
+    for (let cursor = new Date(start); cursor < end; ) {
+      const nextHour = new Date(cursor);
+      nextHour.setMinutes(60, 0, 0);
+      const next = nextHour < end ? nextHour : end;
+      const segmentHours = Math.max(0, (next - cursor) / 3600000);
+      const day = weekdayLabels[cursor.getDay()];
+      const rowIndex = heatRows.indexOf(day);
+      const colIndex = heatSlotIndex(cursor.getHours());
+      if (rowIndex >= 0) grid[rowIndex][colIndex].value += hourlyGross * segmentHours;
+      cursor = next;
+    }
   });
 
   const max = Math.max(...grid.flat().map((cell) => cell.value), 1);
@@ -1751,7 +1812,15 @@ function renderShiftRunner() {
   if (pendingShiftFinish) {
     setRunnerState("finish");
     if (elements.finishShiftTitle) elements.finishShiftTitle.textContent = `${pendingShiftFinish.platform}: итоги смены`;
-    if (elements.finishShiftMeta) elements.finishShiftMeta.textContent = formatClockDuration(runnerElapsedMs());
+    if (elements.finishShiftMeta) {
+      elements.finishShiftMeta.textContent =
+        `${formatDateTime(pendingShiftFinish.startedAt)} - ${formatDateTime(pendingShiftFinish.endedAt)} · ` +
+        `${formatClockDuration(runnerElapsedMs())} · старт ${Number(pendingShiftFinish.odometerStart || 0).toFixed(1)} км`;
+    }
+    const odometerField = elements.finishShiftForm?.elements?.odometerEnd;
+    if (odometerField && pendingShiftFinish.odometerStart && !odometerField.value) {
+      odometerField.min = String(pendingShiftFinish.odometerStart);
+    }
     return;
   }
 
@@ -1760,6 +1829,9 @@ function renderShiftRunner() {
     updateRunnerPlatformButtons();
     setRunnerState("active");
     if (elements.activePlatform) elements.activePlatform.textContent = activeShift.platform;
+    if (elements.activeShiftMeta) {
+      elements.activeShiftMeta.textContent = `${formatDateTime(activeShift.startedAt)} · старт ${Number(activeShift.odometerStart || 0).toFixed(1)} км`;
+    }
     updateActiveShiftTimer();
     activeShiftTimer = window.setInterval(updateActiveShiftTimer, 1000);
     return;
@@ -1769,9 +1841,18 @@ function renderShiftRunner() {
 }
 
 function startRunnerShift() {
+  const odometerStart = readNumber({ get: (name) => (name === "odometerStart" ? elements.startOdometer?.value : "") }, "odometerStart");
+  if (!odometerStart && odometerStart !== 0) return;
+  if (!Number.isFinite(odometerStart) || odometerStart <= 0) {
+    elements.startOdometer?.focus();
+    elements.startOdometer?.reportValidity?.();
+    return;
+  }
+
   activeShift = {
     platform: selectedRunnerPlatform,
     startedAt: new Date().toISOString(),
+    odometerStart,
   };
   pendingShiftFinish = null;
   saveActiveShift();
@@ -1788,13 +1869,33 @@ function finishRunnerShift() {
   renderShiftRunner();
 }
 
+function cancelActiveRunnerShift() {
+  if (!activeShift) return;
+  const shouldCancel = window.confirm("Отменить активную смену? Данные этой смены не сохранятся.");
+  if (!shouldCancel) return;
+
+  pendingShiftFinish = null;
+  clearActiveShift();
+  elements.startOdometer.value = "";
+  renderShiftRunner();
+}
+
 function runnerShiftFromForm(formData) {
   const started = new Date(pendingShiftFinish.startedAt);
   const ended = new Date(pendingShiftFinish.endedAt);
   const gross = readNumber(formData, "gross");
   const expensesValue = readNumber(formData, "expenses");
   const orders = readNumber(formData, "orders");
+  const orderKm = readNumber(formData, "km");
+  const odometerStart = Number(pendingShiftFinish.odometerStart || 0);
+  const odometerEnd = readNumber(formData, "odometerEnd");
+  const totalKm = Math.max(0, odometerEnd - odometerStart);
+  const extraKm = Math.max(0, totalKm - orderKm);
   const platform = pendingShiftFinish.platform;
+  const comment = String(formData.get("comment") || "").trim();
+  const odometerComment = odometerStart && odometerEnd
+    ? `Одометр ${odometerStart.toFixed(1)}-${odometerEnd.toFixed(1)}; всего ${totalKm.toFixed(1)} км; пустой пробег ${extraKm.toFixed(1)} км`
+    : "";
 
   return normalizeShift({
     date: localDateKey(started),
@@ -1808,8 +1909,12 @@ function runnerShiftFromForm(formData) {
     ...platformValues(platform, gross),
     gross,
     other: expensesValue,
-    km: readNumber(formData, "km"),
-    comment: formData.get("comment"),
+    km: orderKm,
+    odometerStart,
+    odometerEnd,
+    totalKm,
+    extraKm,
+    comment: [comment, odometerComment].filter(Boolean).join(" · "),
   });
 }
 
@@ -2062,6 +2167,9 @@ elements.nextPeriod?.addEventListener("click", () => {
 
 elements.viewButtons.forEach((button) => {
   button.addEventListener("click", () => {
+    if (!button.getAttribute("href")) {
+      history.pushState(null, "", `#${button.dataset.view}`);
+    }
     setView(button.dataset.view);
     setSideMenuOpen(false);
   });
@@ -2140,13 +2248,17 @@ elements.finishShiftButton?.addEventListener("click", () => {
   finishRunnerShift();
 });
 
+elements.cancelActiveShiftButton?.addEventListener("click", () => {
+  cancelActiveRunnerShift();
+});
+
 elements.cancelFinishShift?.addEventListener("click", () => {
   pendingShiftFinish = null;
   renderShiftRunner();
 });
 
 function setView(view) {
-  const nextView = ["dashboard", "start", "data", "history"].includes(view) ? view : "home";
+  const nextView = ["dashboard", "start", "data", "history", "profile"].includes(view) ? view : "home";
   elements.viewButtons.forEach((item) => item.classList.toggle("active", item.dataset.view === nextView));
   elements.viewPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.viewPanel === nextView));
   elements.statsPeriodControls?.classList.toggle("hidden", nextView !== "dashboard");
@@ -2367,6 +2479,15 @@ elements.finishShiftForm?.addEventListener("submit", async (event) => {
   if (!pendingShiftFinish) return;
 
   const formData = new FormData(elements.finishShiftForm);
+  const odometerEnd = readNumber(formData, "odometerEnd");
+  if (pendingShiftFinish.odometerStart && odometerEnd < Number(pendingShiftFinish.odometerStart)) {
+    const field = elements.finishShiftForm.elements.odometerEnd;
+    field.setCustomValidity("Пробег после смены не может быть меньше стартового.");
+    field.reportValidity();
+    field.setCustomValidity("");
+    return;
+  }
+
   let nextShift = runnerShiftFromForm(formData);
   nextShift = await saveShiftToCloud(nextShift);
   shifts.push(nextShift);
