@@ -1043,8 +1043,7 @@ function allocatedExpenseTotals(bounds = null) {
 
     let value = amount;
     if (bounds) {
-      const paidAt = new Date(`${expense.date}T12:00`);
-      const allocationStart = weekStart(paidAt);
+      const allocationStart = new Date(`${expense.date}T00:00:00`);
       const allocationEnd = endOfDay(addDays(allocationStart, 6));
       const days = overlapDays(bounds.start, bounds.end, allocationStart, allocationEnd);
       value = days ? (amount / 7) * days : 0;
