@@ -5,18 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TaxiProfit</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=mobile-form-row-1" />
+    <link rel="stylesheet" href="styles.css?v=home-stats-split-1" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <a class="brand" href="#" aria-label="TaxiProfit dashboard">
+        <button class="brand" type="button" id="menuToggle" aria-label="Открыть меню" aria-controls="sideMenu" aria-expanded="false">
           <span class="brand-mark" aria-hidden="true">🚖</span>
           <span>
             <strong>TaxiProfit</strong>
             <small>driver cockpit</small>
           </span>
-        </a>
+        </button>
 
         <div class="top-actions">
           <button class="icon-button" type="button" aria-label="Настройки">⚙</button>
@@ -24,13 +24,28 @@
         </div>
       </header>
 
-      <nav class="screen-tabs" aria-label="Разделы приложения">
-        <a class="screen-tab active" href="#dashboard" data-view="dashboard">Статистика</a>
-        <a class="screen-tab" href="#data" data-view="data">Данные</a>
-        <a class="screen-tab" href="#history" data-view="history">История</a>
-      </nav>
+      <div class="menu-overlay" id="menuOverlay" hidden></div>
+      <aside class="side-menu" id="sideMenu" aria-label="Меню приложения" aria-hidden="true">
+        <div class="side-menu-head">
+          <div class="brand-static">
+            <span class="brand-mark" aria-hidden="true">🚖</span>
+            <span>
+              <strong>TaxiProfit</strong>
+              <small>driver cockpit</small>
+            </span>
+          </div>
+          <button class="menu-close" type="button" id="menuClose" aria-label="Закрыть меню">×</button>
+        </div>
+        <nav class="screen-tabs" aria-label="Разделы приложения">
+          <a class="screen-tab active" href="#home" data-view="home">Главная</a>
+          <a class="screen-tab" href="#dashboard" data-view="dashboard">Статистика</a>
+          <a class="screen-tab" href="#start" data-view="start">Начать смену</a>
+          <a class="screen-tab" href="#data" data-view="data">Данные</a>
+          <a class="screen-tab" href="#history" data-view="history">История</a>
+        </nav>
+      </aside>
 
-      <div class="stats-period-controls" id="statsPeriodControls" aria-label="Выбор периода статистики">
+      <div class="stats-period-controls hidden" id="statsPeriodControls" aria-label="Выбор периода статистики">
         <div class="period-switch" role="group" aria-label="Быстрый период">
           <button class="period active" type="button" data-period="day">День</button>
           <button class="period" type="button" data-period="week">Неделя</button>
@@ -71,7 +86,184 @@
         </div>
       </div>
 
-      <main class="dashboard view-panel active" data-view-panel="dashboard">
+      <main class="start-shift-view view-panel" data-view-panel="start">
+        <section class="panel shift-runner" id="shiftRunner" aria-label="Начать смену">
+          <div class="shift-runner-state active" data-runner-state="idle">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker">Смена</span>
+                <h1>Начать смену</h1>
+              </div>
+            </div>
+            <div class="runner-platforms" aria-label="Выбор платформы">
+              <button class="active" type="button" data-run-platform="Bolt">Bolt</button>
+              <button type="button" data-run-platform="Uklon">Uklon</button>
+              <button type="button" data-run-platform="InDrive">InDrive</button>
+            </div>
+            <button class="submit-button runner-primary" type="button" id="startShiftButton">▶ Начать смену</button>
+          </div>
+
+          <div class="shift-runner-state" data-runner-state="active">
+            <div class="runner-active-head">
+              <div>
+                <span class="section-kicker">Активная смена</span>
+                <h1 id="activePlatform">Bolt</h1>
+              </div>
+              <strong id="activeTimer">00:00:00</strong>
+            </div>
+            <button class="submit-button runner-stop" type="button" id="finishShiftButton">⏹ Завершить смену</button>
+          </div>
+
+          <form class="shift-runner-state runner-finish-form" data-runner-state="finish" id="finishShiftForm">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker">Итоги смены</span>
+                <h1 id="finishShiftTitle">Завершить смену</h1>
+                <p id="finishShiftMeta">00:00:00</p>
+              </div>
+            </div>
+            <div class="finish-grid">
+              <label>
+                Километры
+                <input name="km" type="number" min="0" step="0.1" placeholder="89.4" required />
+              </label>
+              <label>
+                Количество заказов
+                <input name="orders" type="number" min="0" step="1" placeholder="18" required />
+              </label>
+              <label>
+                Выручка, ₴
+                <input name="gross" type="number" min="0" step="0.01" placeholder="3000" required />
+              </label>
+              <label>
+                Расходы, ₴
+                <input name="expenses" type="number" min="0" step="0.01" placeholder="0" />
+              </label>
+              <label class="wide-field">
+                Комментарий
+                <input name="comment" type="text" placeholder="заметка по смене" />
+              </label>
+            </div>
+            <div class="runner-actions">
+              <button class="ghost-button" type="button" id="cancelFinishShift">Назад</button>
+              <button class="submit-button" type="submit">Сохранить смену</button>
+            </div>
+          </form>
+        </section>
+      </main>
+
+      <main class="home-view view-panel active" data-view-panel="home">
+        <section class="hero-grid" aria-label="Главные показатели">
+          <article class="glass-card kpi-card primary-kpi motivation-kpi">
+            <div class="primary-kpi-copy">
+              <div class="card-topline">
+                <span>Сегодня заработано</span>
+                <strong class="profit" id="homeProfitDelta">+0%</strong>
+              </div>
+              <div class="mega-value" id="homeNetProfit">₴ 0</div>
+              <p id="homeProfitFormula">Сравнение со вчерашним днем</p>
+              <div class="today-submetrics">
+                <div>
+                  <span>Чистая прибыль сегодня</span>
+                  <strong id="homeTodayNetValue">₴ 0</strong>
+                </div>
+                <div>
+                  <span>До недельной цели</span>
+                  <strong id="homeWeeklyGoalLeft">₴ 0</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="mini-bars" aria-label="Мини-график дохода за выбранный период">
+              <div class="mini-chart-head">
+                <span>Доход за 7 дней</span>
+                <strong id="homeBestDayLabel">Недостаточно данных</strong>
+              </div>
+              <div class="mini-bars-plot" id="homeMiniBars" aria-hidden="true">
+                <span style="height: 34%"></span>
+                <span style="height: 46%"></span>
+                <span style="height: 39%"></span>
+                <span style="height: 62%"></span>
+                <span class="best" style="height: 88%"></span>
+                <span style="height: 71%"></span>
+                <span style="height: 56%"></span>
+              </div>
+              <div class="mini-bars-caption">
+                <span id="homeMiniStartLabel">Пн</span>
+                <strong id="homeMiniMaxLabel">Макс ₴5 800</strong>
+                <span id="homeMiniEndLabel">Вс</span>
+              </div>
+            </div>
+          </article>
+
+          <div class="kpi-stack">
+            <article class="glass-card kpi-card shift-card plan-card">
+              <div class="card-topline">
+                <span>Недельный план</span>
+                <strong class="profit" id="homeGoalPercent">0%</strong>
+              </div>
+              <div class="kpi-value" id="homeWeekNet">₴ 0</div>
+              <div class="goal-track weekly-track" aria-label="Прогресс недельной цели">
+                <span id="homeGoalProgress"></span>
+              </div>
+              <p id="homeGoalText">из недельной цели</p>
+            </article>
+
+            <article class="glass-card kpi-card danger-card mileage-card forecast-kpi">
+              <div class="card-topline">
+                <span>Прогноз недели</span>
+                <strong id="homePaceLabel">темп</strong>
+              </div>
+              <div class="kpi-value" id="homeForecast">₴ 0</div>
+              <p id="homeForecastText">если продолжишь в таком темпе</p>
+            </article>
+
+            <article class="glass-card kpi-card orders-card">
+              <div class="card-topline">
+                <span>Ритм работы</span>
+                <strong id="homeWeekHours">0 ч</strong>
+              </div>
+              <div class="kpi-value" id="homeWeekOrders">0</div>
+              <p id="homeWeekOps">заказов на этой неделе</p>
+            </article>
+          </div>
+
+          <article class="glass-card assistant-panel average-card">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker ai">Средние показатели</span>
+                <h2>Качество недели</h2>
+              </div>
+            </div>
+            <div class="forecast-card">
+              <span>Средний доход в час</span>
+              <strong id="homeAvgHourValue">₴ 538</strong>
+              <p id="homeAvgHourText">выручка / часы онлайн</p>
+            </div>
+            <div class="insight-list">
+              <article class="insight-card hot">
+                <strong>Средний заказ</strong>
+                <p id="homeAvgOrderText">₴ 2 610 за смену</p>
+              </article>
+              <article class="insight-card warn">
+                <strong>Чистыми за неделю</strong>
+                <p id="homeWeekCleanText">₴ 2 072 за смену</p>
+              </article>
+              <article class="insight-card idea">
+                <strong>Часы и пробег</strong>
+                <p id="homeOpsText">15.6 заказов · 93.9 км за смену</p>
+              </article>
+              <article class="insight-card tariff">
+                <strong>Стоимость км</strong>
+                <p id="homeKmPriceText">₴ 0 за км</p>
+              </article>
+            </div>
+          </article>
+
+        </section>
+      </main>
+
+      <main class="dashboard view-panel" data-view-panel="dashboard">
         <section class="hero-grid" aria-label="Главные показатели">
           <article class="glass-card kpi-card primary-kpi">
             <div class="primary-kpi-copy">
@@ -165,7 +357,6 @@
               </article>
             </div>
           </article>
-
         </section>
 
         <div id="incomeChart" hidden></div>
@@ -214,10 +405,10 @@
           <article class="panel goal-panel">
             <div class="section-head tight">
               <div>
-                <span class="section-kicker">Цель месяца</span>
+                <span class="section-kicker">Цель недели</span>
                 <label class="goal-control">
                   <span>₴</span>
-                  <input id="goalInput" type="number" min="1" step="500" value="70000" aria-label="Цель месяца" />
+                  <input id="goalInput" type="number" min="1" step="500" value="10000" aria-label="Цель недели" />
                 </label>
               </div>
               <strong class="goal-percent" id="goalPercent">61%</strong>
@@ -225,7 +416,7 @@
             <div class="goal-track" aria-label="Прогресс цели">
               <span id="goalProgress"></span>
             </div>
-            <p id="goalText">Осталось ₴ 27 420. При текущем темпе цель будет закрыта 28 мая.</p>
+            <p id="goalText">Осталось ₴ 0. Если продолжишь в таком темпе, неделя будет закрыта выше плана.</p>
           </article>
         </section>
 
@@ -421,6 +612,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=mobile-form-row-1"></script>
+    <script src="app.js?v=home-stats-split-1"></script>
   </body>
 </html>
