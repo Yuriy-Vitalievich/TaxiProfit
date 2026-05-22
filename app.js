@@ -1,9 +1,10 @@
 const STORAGE_KEY = "taxiProfit.shifts.v3";
 const EXPENSE_STORAGE_KEY = "taxiProfit.expenses.v1";
 const CSV_SYNC_STORAGE_KEY = "taxiProfit.csvSync.v1";
-const GOAL_STORAGE_KEY = "taxiProfit.monthGoal.v1";
+const GOAL_STORAGE_KEY = "taxiProfit.weeklyGoal.v1";
+const LEGACY_GOAL_STORAGE_KEY = "taxiProfit.monthGoal.v1";
 const ACTIVE_SHIFT_STORAGE_KEY = "taxiProfit.activeShift.v1";
-const DEFAULT_MONTH_GOAL = 70000;
+const DEFAULT_WEEKLY_GOAL = 10000;
 const SUPABASE_URL = "https://aqogfuzhjqbsanaovcox.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HHwwAnF8AfI0IW1CdlROtg_sOjD-Wl_";
 const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
@@ -91,6 +92,32 @@ const elements = {
   activeTimer: document.querySelector("#activeTimer"),
   finishShiftTitle: document.querySelector("#finishShiftTitle"),
   finishShiftMeta: document.querySelector("#finishShiftMeta"),
+  homeNetProfit: document.querySelector("#homeNetProfit"),
+  homeProfitFormula: document.querySelector("#homeProfitFormula"),
+  homeProfitDelta: document.querySelector("#homeProfitDelta"),
+  homeTodayNetValue: document.querySelector("#homeTodayNetValue"),
+  homeWeeklyGoalLeft: document.querySelector("#homeWeeklyGoalLeft"),
+  homeWeekNet: document.querySelector("#homeWeekNet"),
+  homeGoalPercent: document.querySelector("#homeGoalPercent"),
+  homeGoalProgress: document.querySelector("#homeGoalProgress"),
+  homeGoalText: document.querySelector("#homeGoalText"),
+  homeForecast: document.querySelector("#homeForecast"),
+  homePaceLabel: document.querySelector("#homePaceLabel"),
+  homeForecastText: document.querySelector("#homeForecastText"),
+  homeWeekOrders: document.querySelector("#homeWeekOrders"),
+  homeWeekHours: document.querySelector("#homeWeekHours"),
+  homeWeekOps: document.querySelector("#homeWeekOps"),
+  homeAvgHourValue: document.querySelector("#homeAvgHourValue"),
+  homeAvgHourText: document.querySelector("#homeAvgHourText"),
+  homeAvgOrderText: document.querySelector("#homeAvgOrderText"),
+  homeWeekCleanText: document.querySelector("#homeWeekCleanText"),
+  homeOpsText: document.querySelector("#homeOpsText"),
+  homeKmPriceText: document.querySelector("#homeKmPriceText"),
+  homeMiniBars: document.querySelector("#homeMiniBars"),
+  homeMiniStartLabel: document.querySelector("#homeMiniStartLabel"),
+  homeMiniEndLabel: document.querySelector("#homeMiniEndLabel"),
+  homeMiniMaxLabel: document.querySelector("#homeMiniMaxLabel"),
+  homeBestDayLabel: document.querySelector("#homeBestDayLabel"),
   netProfit: document.querySelector("#netProfit"),
   profitFormula: document.querySelector("#profitFormula"),
   shiftCount: document.querySelector("#shiftCount"),
@@ -125,6 +152,7 @@ const elements = {
   goalInput: document.querySelector("#goalInput"),
   goalPercent: document.querySelector("#goalPercent"),
   goalProgress: document.querySelector("#goalProgress"),
+  goalProgressSecondary: document.querySelector("#goalProgressSecondary"),
   goalText: document.querySelector("#goalText"),
   daysSummary: document.querySelector("#daysSummary"),
   daysGrid: document.querySelector("#daysGrid"),
@@ -169,7 +197,7 @@ let selectedRunnerPlatform = "Bolt";
 let activeShift = loadActiveShift();
 let pendingShiftFinish = null;
 let activeShiftTimer = null;
-let monthGoal = loadMonthGoal();
+let weeklyGoal = loadWeeklyGoal();
 let realtimeClient = null;
 let realtimeReloadTimer = null;
 let cloudLoadedOnce = false;
@@ -245,14 +273,19 @@ function loadCsvSyncMeta() {
   }
 }
 
-function loadMonthGoal() {
+function loadWeeklyGoal() {
   const saved = Number(readStorage(GOAL_STORAGE_KEY));
-  return Number.isFinite(saved) && saved > 0 ? saved : DEFAULT_MONTH_GOAL;
+  if (Number.isFinite(saved) && saved > 0) return saved;
+
+  const legacy = Number(readStorage(LEGACY_GOAL_STORAGE_KEY));
+  if (Number.isFinite(legacy) && legacy > 0 && legacy < 30000) return legacy;
+
+  return DEFAULT_WEEKLY_GOAL;
 }
 
-function saveMonthGoal(value) {
-  monthGoal = Number.isFinite(value) && value > 0 ? value : DEFAULT_MONTH_GOAL;
-  writeStorage(String(monthGoal), GOAL_STORAGE_KEY);
+function saveWeeklyGoal(value) {
+  weeklyGoal = Number.isFinite(value) && value > 0 ? value : DEFAULT_WEEKLY_GOAL;
+  writeStorage(String(weeklyGoal), GOAL_STORAGE_KEY);
 }
 
 function saveCsvSyncMeta(type, count) {
@@ -344,7 +377,7 @@ function initialsFromTelegramUser(user) {
 function syncTelegramBackButton(view = location.hash.replace("#", "")) {
   if (!telegramApp?.BackButton) return;
 
-  if (view === "data" || view === "history") {
+  if (view !== "home") {
     telegramApp.BackButton.show();
   } else {
     telegramApp.BackButton.hide();
@@ -373,8 +406,8 @@ function setupTelegramMiniApp() {
   telegramApp.onEvent?.("themeChanged", applyTelegramTheme);
   telegramApp.onEvent?.("viewportChanged", updateTelegramViewport);
   telegramApp.BackButton?.onClick?.(() => {
-    setView("dashboard");
-    history.replaceState(null, "", "#dashboard");
+    setView("home");
+    history.replaceState(null, "", "#home");
   });
 }
 
@@ -460,9 +493,15 @@ async function loadCloudSettings() {
 
   try {
     const [settings] = await cloudRequest("settings", { query: "?key=eq.dashboard&select=payload&limit=1" });
-    const nextGoal = Number(settings?.payload?.monthGoal);
+    const payload = settings?.payload || {};
+    const legacyGoal = Number(payload.monthGoal);
+    const nextGoal = Number.isFinite(Number(payload.weeklyGoal))
+      ? Number(payload.weeklyGoal)
+      : legacyGoal > 0 && legacyGoal < 30000
+        ? legacyGoal
+        : 0;
     if (Number.isFinite(nextGoal) && nextGoal > 0) {
-      saveMonthGoal(nextGoal);
+      saveWeeklyGoal(nextGoal);
       renderAll();
     }
     return true;
@@ -579,7 +618,7 @@ async function saveSettingsToCloud() {
     await cloudRequest("settings", {
       method: "POST",
       query: "?on_conflict=key",
-      body: { key: "dashboard", payload: { monthGoal } },
+      body: { key: "dashboard", payload: { weeklyGoal } },
       prefer: "resolution=merge-duplicates,return=representation",
     });
   } catch (error) {
@@ -1059,6 +1098,66 @@ function periodSummary(period) {
   };
 }
 
+function summarizeEntries(sourceShifts, sourceExpenses = []) {
+  const workedDays = new Set(sourceShifts.filter(isWorkShift).map((shift) => shift.date).filter(Boolean));
+  const shiftsWorked = workedDays.size;
+  const hours = sum(sourceShifts, "hours");
+  const gross = sum(sourceShifts, "gross");
+  const orders = sourceShifts.reduce((total, shift) => total + totalOrders(shift), 0);
+  const km = sum(sourceShifts, "km");
+  const fuel = sum(sourceShifts, "fuel") + sumExpensesByCategory(sourceExpenses, ["Топливо"]);
+  const rent = sum(sourceShifts, "rent") + sumExpensesByCategory(sourceExpenses, ["Аренда авто", "Аренда"]);
+  const wash = sumExpensesByCategory(sourceExpenses, ["Мойка"]);
+  const fine = sumExpensesByCategory(sourceExpenses, ["Штраф"]);
+  const repair = sumExpensesByCategory(sourceExpenses, ["Ремонт"]);
+  const other = sum(sourceShifts, "other") + sumExpensesByCategory(sourceExpenses, ["Прочее"]);
+  const fees = sum(sourceShifts, "fees") + sumExpensesByCategory(sourceExpenses, ["Комиссии"]);
+  const expensesTotal = fuel + rent + wash + fine + repair + fees + other;
+
+  return {
+    shiftsWorked,
+    gross,
+    hours,
+    orders,
+    km,
+    net: gross ? gross - expensesTotal : 0,
+    expenses: expensesTotal,
+    fuel,
+    rent,
+    wash,
+    fine,
+    repair,
+    fees,
+    other,
+  };
+}
+
+function summaryForDate(date) {
+  return summarizeEntries(
+    shifts.filter((shift) => shift.date === date),
+    expenses.filter((expense) => expense.date === date)
+  );
+}
+
+function currentWeekSummary() {
+  const start = weekStart(new Date());
+  const end = addDays(start, 6);
+  const weekShifts = shifts.filter((shift) => {
+    const value = dateValue(shift);
+    return value >= start && value <= end;
+  });
+  const weekExpenses = expenses.filter((expense) => {
+    const value = new Date(`${expense.date}T12:00`);
+    return value >= start && value <= end;
+  });
+
+  return {
+    ...summarizeEntries(weekShifts, weekExpenses),
+    start,
+    end,
+  };
+}
+
 function sumExpensesByCategory(source, names) {
   return source.reduce((total, expense) => {
     return names.includes(expense.category) ? total + Number(expense.amount || 0) : total;
@@ -1160,10 +1259,64 @@ function renderMetrics(period) {
   elements.avgOpsText.textContent = `${Number(summary.avgOrders.toFixed(1))} заказов · ${Number(summary.avgKm.toFixed(1))} км за смену`;
   elements.avgKmPriceText.textContent = `${money(summary.avgKmPrice)} за км`;
 
+  renderHomeMetrics();
   renderExpenses(summary);
-  renderGoal(summary);
+  renderGoal(currentWeekSummary());
   renderMiniBars();
   renderDays(summary);
+}
+
+function renderHomeMetrics() {
+  const today = dateKey(new Date());
+  const yesterday = dateKey(addDays(new Date(), -1));
+  const todaySummary = summaryForDate(today);
+  const yesterdaySummary = summaryForDate(yesterday);
+  const week = currentWeekSummary();
+  const daysPassed = Math.max(1, Math.min(7, Math.floor((new Date(`${today}T12:00`) - week.start) / 86400000) + 1));
+  const weekGoalValue = Math.max(weeklyGoal, 1);
+  const weekNet = Math.max(0, week.net);
+  const weekProgress = Math.min(100, Math.round((weekNet / weekGoalValue) * 100));
+  const weeklyRest = Math.max(0, weekGoalValue - weekNet);
+  const forecast = Math.max(0, Math.round((weekNet / daysPassed) * 7));
+  const todayDelta = percentChange(todaySummary.gross, yesterdaySummary.gross);
+  const averageHourGross = week.hours ? week.gross / week.hours : 0;
+  const averageOrderGross = week.orders ? week.gross / week.orders : 0;
+  const averageKmPrice = week.km ? week.gross / week.km : 0;
+  const paceLabel = forecast >= weekGoalValue ? "выше плана" : "ниже плана";
+
+  elements.homeNetProfit.textContent = money(todaySummary.gross);
+  elements.homeProfitFormula.textContent = yesterdaySummary.gross
+    ? `${todayDelta >= 0 ? "+" : ""}${todayDelta}% к вчерашнему дню`
+    : todaySummary.gross
+      ? "Вчера заработка не было"
+      : "Сегодня заработка пока нет";
+  elements.homeProfitDelta.textContent = yesterdaySummary.gross
+    ? `${todayDelta >= 0 ? "+" : ""}${todayDelta}%`
+    : todaySummary.gross
+      ? "+100%"
+      : "0%";
+  elements.homeProfitDelta.className = todayDelta >= 0 ? "profit" : "loss";
+  elements.homeTodayNetValue.textContent = money(todaySummary.net);
+  elements.homeWeeklyGoalLeft.textContent = `${money(weeklyRest)} из ${money(weekGoalValue)}`;
+
+  elements.homeWeekNet.textContent = money(weekNet);
+  elements.homeGoalPercent.textContent = `${weekProgress}%`;
+  elements.homeGoalProgress.style.width = `${weekProgress}%`;
+  elements.homeGoalText.textContent = `выполнено ${weekProgress}% · осталось ${money(weeklyRest)}`;
+  elements.homeForecast.textContent = money(forecast);
+  elements.homePaceLabel.textContent = paceLabel;
+  elements.homePaceLabel.className = forecast >= weekGoalValue ? "profit" : "loss";
+  elements.homeForecastText.textContent = `если продолжишь в таком темпе → ${money(forecast)} за неделю`;
+  elements.homeWeekOrders.textContent = new Intl.NumberFormat("uk-UA").format(week.orders);
+  elements.homeWeekHours.textContent = `${Number(week.hours.toFixed(1))} ч`;
+  elements.homeWeekOps.textContent = `${Number(week.km.toFixed(1))} км · ${week.shiftsWorked} рабочих дней`;
+  elements.homeAvgHourValue.textContent = `${money(averageHourGross)}/ч`;
+  elements.homeAvgHourText.textContent = `${money(week.gross)} выручка · ${Number(week.hours.toFixed(1))} ч`;
+  elements.homeAvgOrderText.textContent = `${money(averageOrderGross)} за заказ`;
+  elements.homeWeekCleanText.textContent = `${money(week.net)} чистыми · ${money(week.expenses)} расходы`;
+  elements.homeOpsText.textContent = `${Number(week.hours.toFixed(1))} ч · ${Number(week.km.toFixed(1))} км`;
+  elements.homeKmPriceText.textContent = `${money(averageKmPrice)} за км`;
+  renderHomeMiniBars();
 }
 
 function renderMiniBars() {
@@ -1200,6 +1353,51 @@ function renderMiniBars() {
   elements.miniEndLabel.textContent = formatShortDate(visibleRecords[visibleRecords.length - 1].date);
 }
 
+function renderHomeMiniBars() {
+  const end = new Date();
+  const start = addDays(end, -6);
+  const visibleRecords = [];
+
+  for (let date = new Date(start); date <= end; date = addDays(date, 1)) {
+    const key = dateKey(date);
+    const record = summaryForDate(key);
+    visibleRecords.push({
+      date: key,
+      gross: record.gross,
+      isWorkday: record.gross > 0,
+    });
+  }
+
+  const activeRecords = visibleRecords.filter((record) => record.gross > 0);
+
+  if (activeRecords.length < 2) {
+    elements.homeMiniBars.innerHTML = Array.from({ length: 7 }, () => `<span class="empty" style="height: 18%"></span>`).join("");
+    elements.homeBestDayLabel.textContent = "Недостаточно данных для аналитики";
+    elements.homeMiniMaxLabel.textContent = "Макс ₴0";
+    elements.homeMiniStartLabel.textContent = formatShortDate(visibleRecords[0]?.date || dateKey(start));
+    elements.homeMiniEndLabel.textContent = formatShortDate(visibleRecords[visibleRecords.length - 1]?.date || dateKey(end));
+    return;
+  }
+
+  const max = Math.max(...visibleRecords.map((item) => item.gross), 1);
+  const best = activeRecords.reduce((winner, item) => {
+    return item.gross > winner.gross ? item : winner;
+  }, activeRecords[0]);
+
+  elements.homeMiniBars.innerHTML = visibleRecords
+    .map((item) => {
+      const value = item.gross;
+      const height = Math.max(18, Math.round((value / max) * 88));
+      const className = item.date === best.date ? "best" : "";
+      return `<span class="${className}" style="height: ${height}%"><i>${formatShortDate(item.date)}</i><b>${compactMoney(item.gross)}</b></span>`;
+    })
+    .join("");
+  elements.homeBestDayLabel.textContent = `Лучший доход: ${formatDate(best.date)}`;
+  elements.homeMiniMaxLabel.textContent = `Макс ${money(best.gross)}`;
+  elements.homeMiniStartLabel.textContent = formatShortDate(visibleRecords[0].date);
+  elements.homeMiniEndLabel.textContent = formatShortDate(visibleRecords[visibleRecords.length - 1].date);
+}
+
 function selectMiniRecords(records, maxItems) {
   if (records.length <= maxItems) return records;
   const bestIndex = records.reduce((winnerIndex, item, index) => {
@@ -1228,17 +1426,22 @@ function renderExpenses(summary) {
 }
 
 function renderGoal(summary) {
-  const monthNet = periodSummary("month").net;
-  const goal = Math.max(monthGoal, 1);
-  const progress = Math.min(100, Math.round((monthNet / goal) * 100));
-  const rest = Math.max(0, goal - monthNet);
+  const goal = Math.max(weeklyGoal, 1);
+  const weekNet = Math.max(0, summary.net);
+  const progress = Math.min(100, Math.round((weekNet / goal) * 100));
+  const rest = Math.max(0, goal - weekNet);
+  const today = new Date();
+  const start = weekStart(today);
+  const daysPassed = Math.max(1, Math.min(7, Math.floor((new Date(`${dateKey(today)}T12:00`) - start) / 86400000) + 1));
+  const forecast = Math.max(0, Math.round((weekNet / daysPassed) * 7));
 
-  if (elements.goalInput) elements.goalInput.value = String(monthGoal);
+  if (elements.goalInput) elements.goalInput.value = String(weeklyGoal);
   elements.goalPercent.textContent = `${progress}%`;
   elements.goalProgress.style.width = `${progress}%`;
+  if (elements.goalProgressSecondary) elements.goalProgressSecondary.style.width = `${progress}%`;
   elements.goalText.textContent = rest
-    ? `Осталось ${money(rest)}. При текущем темпе цель близко к концу месяца.`
-    : "Цель месяца закрыта. Все, дальше уже бонусная зона.";
+    ? `Осталось ${money(rest)}. Если продолжишь в таком темпе → ${money(forecast)} за неделю.`
+    : `Цель недели закрыта. Прогноз при текущем темпе → ${money(forecast)}.`;
 }
 
 function dateKey(value) {
@@ -1943,7 +2146,7 @@ elements.cancelFinishShift?.addEventListener("click", () => {
 });
 
 function setView(view) {
-  const nextView = ["start", "data", "history"].includes(view) ? view : "dashboard";
+  const nextView = ["dashboard", "start", "data", "history"].includes(view) ? view : "home";
   elements.viewButtons.forEach((item) => item.classList.toggle("active", item.dataset.view === nextView));
   elements.viewPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.viewPanel === nextView));
   elements.statsPeriodControls?.classList.toggle("hidden", nextView !== "dashboard");
@@ -2224,7 +2427,7 @@ elements.importExpensesButton.addEventListener("click", () => {
 });
 
 elements.goalInput?.addEventListener("change", () => {
-  saveMonthGoal(Number(elements.goalInput.value));
+  saveWeeklyGoal(Number(elements.goalInput.value));
   scheduleSettingsSave();
   renderAll();
 });
@@ -2232,7 +2435,7 @@ elements.goalInput?.addEventListener("change", () => {
 elements.goalInput?.addEventListener("input", () => {
   const nextGoal = Number(elements.goalInput.value);
   if (!Number.isFinite(nextGoal) || nextGoal <= 0) return;
-  saveMonthGoal(nextGoal);
+  saveWeeklyGoal(nextGoal);
   scheduleSettingsSave();
   renderAll();
 });

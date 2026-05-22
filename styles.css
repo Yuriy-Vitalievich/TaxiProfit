@@ -780,6 +780,14 @@ a {
     var(--panel-strong);
 }
 
+.motivation-kpi {
+  border-color: rgba(40, 242, 156, 0.28);
+  background:
+    radial-gradient(circle at 18% 12%, rgba(40, 242, 156, 0.24), transparent 24rem),
+    linear-gradient(140deg, rgba(40, 242, 156, 0.2), rgba(74, 168, 255, 0.08) 54%, rgba(178, 108, 255, 0.08)),
+    var(--panel-strong);
+}
+
 .primary-kpi-copy {
   display: grid;
   align-content: start;
@@ -858,12 +866,56 @@ a {
   font-size: clamp(3rem, 4.6vw, 4.85rem);
 }
 
+.today-submetrics {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.today-submetrics div {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.today-submetrics span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.today-submetrics strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text);
+  font-size: clamp(1.05rem, 2.2vw, 1.32rem);
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
 .kpi-value {
   font-size: clamp(2.35rem, 3.7vw, 3.55rem);
 }
 
 .mileage-card .kpi-value {
   font-size: clamp(2.15rem, 3.25vw, 3.1rem);
+}
+
+.plan-card,
+.forecast-kpi {
+  border-color: rgba(40, 242, 156, 0.16);
+}
+
+.plan-card .kpi-value,
+.forecast-kpi .kpi-value {
+  font-size: clamp(2rem, 3.2vw, 3rem);
+}
+
+.weekly-track {
+  height: 12px;
+  margin-top: 14px;
 }
 
 .kpi-card p,
@@ -2260,6 +2312,10 @@ h2 {
     min-height: auto;
   }
 
+  .today-submetrics {
+    margin-top: 12px;
+  }
+
   .glass-card,
   .panel {
     border-radius: 18px;
@@ -2282,6 +2338,11 @@ h2 {
 
   .kpi-value {
     font-size: clamp(2rem, 12vw, 2.65rem);
+  }
+
+  .plan-card .kpi-value,
+  .forecast-kpi .kpi-value {
+    font-size: clamp(1.9rem, 10vw, 2.45rem);
   }
 
   .mini-chart-head,
@@ -2491,6 +2552,10 @@ h2 {
 
   .kpi-value {
     font-size: 2rem;
+  }
+
+  .today-submetrics strong {
+    font-size: 1.12rem;
   }
 
   .glass-card,
