@@ -736,6 +736,12 @@ function money(value) {
   return `₴ ${new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 0 }).format(Math.round(value || 0))}`;
 }
 
+function signedMoney(value) {
+  const amount = Math.round(Number(value || 0));
+  if (!amount) return "₴ 0";
+  return `${amount > 0 ? "+" : "-"}${money(Math.abs(amount))}`;
+}
+
 function moneyInputValue(value) {
   const amount = Number(value || 0);
   return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
@@ -1278,26 +1284,20 @@ function renderHomeMetrics() {
   const weekProgress = Math.min(100, Math.round((weekNet / weekGoalValue) * 100));
   const weeklyRest = Math.max(0, weekGoalValue - weekNet);
   const forecast = Math.max(0, Math.round((weekNet / daysPassed) * 7));
-  const todayDelta = percentChange(todaySummary.gross, yesterdaySummary.gross);
+  const todayDifference = todaySummary.gross - yesterdaySummary.gross;
   const averageHourGross = week.hours ? week.gross / week.hours : 0;
   const averageOrderGross = week.orders ? week.gross / week.orders : 0;
   const averageKmPrice = week.km ? week.gross / week.km : 0;
   const paceLabel = forecast >= weekGoalValue ? "выше плана" : "ниже плана";
 
   elements.homeNetProfit.textContent = money(todaySummary.gross);
-  elements.homeProfitFormula.textContent = yesterdaySummary.gross
-    ? `${todayDelta >= 0 ? "+" : ""}${todayDelta}% к вчерашнему дню`
-    : todaySummary.gross
-      ? "Вчера заработка не было"
-      : "Сегодня заработка пока нет";
-  elements.homeProfitDelta.textContent = yesterdaySummary.gross
-    ? `${todayDelta >= 0 ? "+" : ""}${todayDelta}%`
-    : todaySummary.gross
-      ? "+100%"
-      : "0%";
-  elements.homeProfitDelta.className = todayDelta >= 0 ? "profit" : "loss";
+  elements.homeProfitFormula.textContent = yesterdaySummary.gross || todaySummary.gross
+    ? `${signedMoney(todayDifference)} ${todayDifference >= 0 ? "больше" : "меньше"} чем вчера`
+    : "Сегодня заработка пока нет";
+  elements.homeProfitDelta.textContent = signedMoney(todayDifference);
+  elements.homeProfitDelta.className = todayDifference >= 0 ? "profit" : "loss";
   elements.homeTodayNetValue.textContent = money(todaySummary.net);
-  elements.homeWeeklyGoalLeft.textContent = `${money(weeklyRest)} из ${money(weekGoalValue)}`;
+  elements.homeWeeklyGoalLeft.textContent = money(weeklyRest);
 
   elements.homeWeekNet.textContent = money(weekNet);
   elements.homeGoalPercent.textContent = `${weekProgress}%`;

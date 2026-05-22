@@ -7,3 +7,5 @@ TaxiProfit home motivation page
 2026-05-22T09:35:00Z
 TaxiProfit restore statistics dashboard
 2026-05-22T09:50:00Z
+TaxiProfit telegram dashboard fixes
+2026-05-22T10:05:00Z
