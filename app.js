@@ -1058,6 +1058,68 @@ function allocatedExpenseTotals(bounds = null) {
   return totals;
 }
 
+function emptyFinancials() {
+  return {
+    net: 0,
+    expenses: 0,
+    fuel: 0,
+    rent: 0,
+    wash: 0,
+    fine: 0,
+    repair: 0,
+    fees: 0,
+    other: 0,
+  };
+}
+
+function dayFinancials(date) {
+  const dayShifts = shifts.filter((shift) => shift.date === date);
+  const gross = sum(dayShifts, "gross");
+  if (!gross) return emptyFinancials();
+
+  const allocated = allocatedExpenseTotals(dayBounds(date));
+  const fuel = sum(dayShifts, "fuel") + allocated.fuel;
+  const rent = sum(dayShifts, "rent") + allocated.rent;
+  const wash = allocated.wash;
+  const fine = allocated.fine;
+  const repair = allocated.repair;
+  const fees = sum(dayShifts, "fees") + allocated.fees;
+  const other = sum(dayShifts, "other") + allocated.other;
+  const expensesTotal = fuel + rent + wash + fine + repair + fees + other;
+
+  return {
+    net: gross - expensesTotal,
+    expenses: expensesTotal,
+    fuel,
+    rent,
+    wash,
+    fine,
+    repair,
+    fees,
+    other,
+  };
+}
+
+function periodFinancials(bounds) {
+  if (!bounds) return null;
+
+  const totals = emptyFinancials();
+  for (let day = new Date(bounds.start); day <= bounds.end; day = addDays(day, 1)) {
+    const current = dayFinancials(dateKey(day));
+    totals.net += current.net;
+    totals.expenses += current.expenses;
+    totals.fuel += current.fuel;
+    totals.rent += current.rent;
+    totals.wash += current.wash;
+    totals.fine += current.fine;
+    totals.repair += current.repair;
+    totals.fees += current.fees;
+    totals.other += current.other;
+  }
+
+  return totals;
+}
+
 function rangeShifts(bounds) {
   if (!bounds) return shifts;
   return shifts.filter((shift) => {
@@ -1067,11 +1129,8 @@ function rangeShifts(bounds) {
 }
 
 function rangeNet(bounds) {
-  const source = rangeShifts(bounds);
-  const gross = sum(source, "gross");
-  const embeddedExpenses = sum(source, "fuel") + sum(source, "rent") + sum(source, "other") + sum(source, "fees");
-  const allocated = allocatedExpenseTotals(bounds);
-  return gross - embeddedExpenses - allocated.total;
+  const financials = periodFinancials(bounds);
+  return financials ? financials.net : 0;
 }
 
 function previousBounds(period) {
@@ -1115,6 +1174,7 @@ function periodSummary(period) {
   const current = currentRange(period);
   const bounds = period === "all" ? null : periodBounds(period);
   const allocatedExpenses = allocatedExpenseTotals(bounds);
+  const effectiveFinancials = periodFinancials(bounds);
   const workedDays = new Set(current.filter(isWorkShift).map((shift) => shift.date).filter(Boolean));
   const calendarDays = dayRecords(period);
   const shiftsWorked = workedDays.size;
@@ -1127,15 +1187,15 @@ function periodSummary(period) {
   const embeddedRent = sum(current, "rent");
   const embeddedOther = sum(current, "other");
   const embeddedFees = sum(current, "fees");
-  const fuel = embeddedFuel + allocatedExpenses.fuel;
-  const rent = embeddedRent + allocatedExpenses.rent;
-  const wash = allocatedExpenses.wash;
-  const fine = allocatedExpenses.fine;
-  const repair = allocatedExpenses.repair;
-  const other = embeddedOther + allocatedExpenses.other;
-  const fees = embeddedFees + allocatedExpenses.fees;
+  const fuel = effectiveFinancials ? effectiveFinancials.fuel : embeddedFuel + allocatedExpenses.fuel;
+  const rent = effectiveFinancials ? effectiveFinancials.rent : embeddedRent + allocatedExpenses.rent;
+  const wash = effectiveFinancials ? effectiveFinancials.wash : allocatedExpenses.wash;
+  const fine = effectiveFinancials ? effectiveFinancials.fine : allocatedExpenses.fine;
+  const repair = effectiveFinancials ? effectiveFinancials.repair : allocatedExpenses.repair;
+  const other = effectiveFinancials ? effectiveFinancials.other : embeddedOther + allocatedExpenses.other;
+  const fees = effectiveFinancials ? effectiveFinancials.fees : embeddedFees + allocatedExpenses.fees;
   const expensesTotal = fuel + rent + wash + fine + repair + fees + other;
-  const currentNet = gross - expensesTotal;
+  const currentNet = effectiveFinancials ? effectiveFinancials.net : gross - expensesTotal;
 
   return {
     current,
@@ -1425,8 +1485,7 @@ function dayRecords(period) {
   });
 
   grouped.forEach((record) => {
-    const bounds = dayBounds(record.date);
-    record.expenses = allocatedExpenseTotals(bounds).total;
+    record.expenses = Number(record.gross || 0) ? dayFinancials(record.date).expenses : 0;
   });
 
   return [...grouped.values()]
