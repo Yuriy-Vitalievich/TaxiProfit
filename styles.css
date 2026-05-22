@@ -619,14 +619,13 @@ a {
 .screen-tabs {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 8px;
+  gap: 10px;
   align-content: start;
   margin: 0;
-  padding: 4px;
+  padding: 0;
   width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.055);
+  border: 0;
+  background: transparent;
 }
 
 .screen-tab {
@@ -634,9 +633,9 @@ a {
   place-items: center start;
   min-height: 48px;
   padding: 0 16px;
-  border: 0;
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.045);
   color: var(--muted);
   cursor: pointer;
   font-weight: 900;
