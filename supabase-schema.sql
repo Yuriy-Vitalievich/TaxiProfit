@@ -6,13 +6,24 @@ create table if not exists public.profiles (
   telegram_username text,
   display_name text,
   driver_name text,
+  car_ownership text,
+  car_brand text,
   car_model text,
+  car_year integer,
+  fuel_type text,
+  fuel_consumption numeric,
+  odometer numeric,
   car_number text,
   default_platform text,
+  rent_amount numeric,
+  rent_frequency text,
+  rent_payment_day text,
+  platforms jsonb not null default '[]'::jsonb,
   phone text,
   city text,
   avatar_url text,
   weekly_goal numeric not null default 10000,
+  onboarding_completed boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -46,6 +57,17 @@ alter table public.settings add column if not exists id uuid default gen_random_
 alter table public.shifts add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table public.expenses add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table public.settings add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table public.profiles add column if not exists car_ownership text;
+alter table public.profiles add column if not exists car_brand text;
+alter table public.profiles add column if not exists car_year integer;
+alter table public.profiles add column if not exists fuel_type text;
+alter table public.profiles add column if not exists fuel_consumption numeric;
+alter table public.profiles add column if not exists odometer numeric;
+alter table public.profiles add column if not exists rent_amount numeric;
+alter table public.profiles add column if not exists rent_frequency text;
+alter table public.profiles add column if not exists rent_payment_day text;
+alter table public.profiles add column if not exists platforms jsonb not null default '[]'::jsonb;
+alter table public.profiles add column if not exists onboarding_completed boolean not null default false;
 
 update public.settings
 set id = gen_random_uuid()
