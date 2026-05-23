@@ -5,9 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TaxiProfit</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=onboarding-1" />
+    <link rel="stylesheet" href="styles.css?v=auth-flow-1" />
   </head>
   <body>
+    <section class="auth-overlay" id="authOverlay" hidden aria-label="Авторизация">
+      <div class="auth-gate-card">
+        <div class="onboarding-logo" aria-hidden="true">🚖</div>
+        <span class="section-kicker">TaxiProfit</span>
+        <h1>Вход для водителя</h1>
+        <p>Сначала подключим аккаунт, потом настроим профиль авто и начнем считать твою статистику.</p>
+        <button class="submit-button" type="button" id="authStartButton">Продолжить</button>
+        <form class="auth-email-line" id="authForm">
+          <input name="email" type="email" autocomplete="email" placeholder="или email для ссылки входа" />
+          <button class="ghost-button" type="submit">Отправить</button>
+        </form>
+        <p class="profile-hint" id="authMessage">В Telegram приложение привяжет профиль к твоему Telegram ID.</p>
+      </div>
+    </section>
+
     <section class="onboarding-overlay" id="onboardingOverlay" hidden aria-label="Регистрация водителя">
       <div class="onboarding-card">
         <div class="onboarding-progress" aria-hidden="true">
@@ -778,32 +793,18 @@
           </div>
 
           <div class="profile-grid">
-            <article class="profile-card auth-card">
+            <article class="profile-card auth-card compact-profile-card">
               <span class="profile-card-label">Аккаунт</span>
-              <strong id="authStatusTitle">Проверяем вход...</strong>
-              <p id="authStatusText">Подключаем Supabase Auth и Telegram-профиль.</p>
-              <dl class="profile-facts">
-                <div>
-                  <dt>Telegram ID</dt>
-                  <dd id="profileTelegramId">не передан</dd>
-                </div>
-                <div>
-                  <dt>Supabase user</dt>
-                  <dd id="profileSupabaseId">ожидаем</dd>
-                </div>
-              </dl>
+              <strong id="authStatusTitle">Профиль подключен</strong>
+              <p id="authStatusText">Данные сохраняются в Supabase и синхронизируются между устройствами.</p>
             </article>
 
-            <form class="profile-card auth-form" id="authForm">
-              <span class="profile-card-label">Вход</span>
-              <label>
-                Email для входа
-                <input name="email" type="email" autocomplete="email" placeholder="you@example.com" />
-              </label>
-              <button class="ghost-button" type="submit">Получить ссылку</button>
+            <div class="profile-card auth-form compact-profile-card">
+              <span class="profile-card-label">Сессия</span>
+              <strong id="profileDriverLabel">Водитель</strong>
+              <p id="profileCarLabel">Авто не указано</p>
               <button class="ghost-button danger" type="button" id="signOutButton">Выйти</button>
-              <p id="authMessage" class="profile-hint">Можно работать через Telegram ID, а email позже привяжет данные к постоянному аккаунту.</p>
-            </form>
+            </div>
           </div>
 
           <form class="profile-settings-form" id="profileForm">
@@ -861,6 +862,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=onboarding-1"></script>
+    <script src="app.js?v=auth-flow-1"></script>
   </body>
 </html>
