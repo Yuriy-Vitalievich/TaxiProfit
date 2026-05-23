@@ -73,7 +73,8 @@ body.telegram-mini-app select {
   user-select: text;
 }
 
-body.onboarding-open {
+body.onboarding-open,
+body.auth-open {
   overflow: hidden;
 }
 
@@ -123,7 +124,8 @@ a {
   padding: 14px;
 }
 
-.onboarding-overlay {
+.onboarding-overlay,
+.auth-overlay {
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -137,11 +139,13 @@ a {
   backdrop-filter: blur(22px);
 }
 
-.onboarding-overlay[hidden] {
+.onboarding-overlay[hidden],
+.auth-overlay[hidden] {
   display: none;
 }
 
-.onboarding-card {
+.onboarding-card,
+.auth-gate-card {
   width: min(720px, 100%);
   max-height: min(820px, calc(100vh - 28px));
   overflow-y: auto;
@@ -154,6 +158,45 @@ a {
   box-shadow:
     0 30px 90px rgba(0, 0, 0, 0.55),
     inset 0 1px 0 rgba(255, 255, 255, 0.11);
+}
+
+.auth-gate-card {
+  display: grid;
+  gap: 16px;
+  width: min(560px, 100%);
+}
+
+.auth-gate-card h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(2.25rem, 8vw, 3.6rem);
+  line-height: 1.04;
+}
+
+.auth-gate-card p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.auth-email-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.auth-email-line input {
+  min-height: 54px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 900;
+  outline: none;
 }
 
 .onboarding-progress {
@@ -2744,7 +2787,8 @@ h2 {
     grid-template-columns: 1fr;
   }
 
-  .onboarding-actions {
+  .onboarding-actions,
+  .auth-email-line {
     grid-template-columns: 1fr;
   }
 

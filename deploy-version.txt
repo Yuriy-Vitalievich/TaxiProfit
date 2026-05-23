@@ -21,3 +21,5 @@ TaxiProfit auth profile MVP
 2026-05-23T02:05:00Z
 TaxiProfit driver onboarding
 2026-05-23T02:35:00Z
+TaxiProfit simplified auth flow
+2026-05-24T00:00:00Z

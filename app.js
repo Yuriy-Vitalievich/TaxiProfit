@@ -207,6 +207,8 @@ const elements = {
   clearData: document.querySelector("#clearData"),
   profileButton: document.querySelector("#profileButton"),
   authForm: document.querySelector("#authForm"),
+  authOverlay: document.querySelector("#authOverlay"),
+  authStartButton: document.querySelector("#authStartButton"),
   authMessage: document.querySelector("#authMessage"),
   authStatusTitle: document.querySelector("#authStatusTitle"),
   authStatusText: document.querySelector("#authStatusText"),
@@ -214,6 +216,8 @@ const elements = {
   profileForm: document.querySelector("#profileForm"),
   profileTelegramId: document.querySelector("#profileTelegramId"),
   profileSupabaseId: document.querySelector("#profileSupabaseId"),
+  profileDriverLabel: document.querySelector("#profileDriverLabel"),
+  profileCarLabel: document.querySelector("#profileCarLabel"),
   profileSaveStatus: document.querySelector("#profileSaveStatus"),
   onboardingOverlay: document.querySelector("#onboardingOverlay"),
   onboardingProgress: document.querySelector("#onboardingProgress"),
@@ -564,6 +568,18 @@ function getCurrentUserId() {
   return currentUser?.id || null;
 }
 
+function setAuthGateOpen(isOpen) {
+  if (!elements.authOverlay) return;
+  elements.authOverlay.hidden = !isOpen;
+  document.body.classList.toggle("auth-open", isOpen);
+}
+
+function updateAccessFlow() {
+  const needsAuth = !authReady || !currentUser;
+  setAuthGateOpen(needsAuth);
+  renderOnboarding();
+}
+
 function createAuthClient() {
   if (authClient || !hasRealtimeClient()) return authClient;
 
@@ -581,7 +597,7 @@ function createAuthClient() {
     currentUser = session?.user || null;
     authReady = true;
     renderProfile();
-    renderOnboarding();
+    updateAccessFlow();
     if (currentUser) {
       await ensureUserProfile();
       await loadCloudData({ applyEmpty: true, silent: true });
@@ -599,7 +615,7 @@ async function initializeAuth() {
   if (!client) {
     authReady = true;
     renderProfile();
-    renderOnboarding();
+    updateAccessFlow();
     setSyncStatus("Supabase Auth недоступен: работаем локально.");
     return false;
   }
@@ -610,18 +626,20 @@ async function initializeAuth() {
     currentUser = currentSession?.user || null;
 
     if (!currentUser) {
-      await signInAnonymously();
+      authReady = true;
+      renderProfile();
+      updateAccessFlow();
     } else {
       authReady = true;
       await ensureUserProfile();
       renderProfile();
-      renderOnboarding();
+      updateAccessFlow();
     }
     return Boolean(currentUser);
   } catch (error) {
     authReady = true;
     renderProfile();
-    renderOnboarding();
+    updateAccessFlow();
     setSyncStatus("Auth не подключился. Проверь настройки Supabase Auth.");
     console.warn("Supabase Auth unavailable.", error);
     return false;
@@ -650,12 +668,12 @@ async function signInAnonymously() {
     authReady = true;
     await ensureUserProfile();
     renderProfile();
-    renderOnboarding();
+    updateAccessFlow();
     return Boolean(currentUser);
   } catch (error) {
     authReady = true;
     renderProfile();
-    renderOnboarding();
+    updateAccessFlow();
     setSyncStatus("Включи Anonymous sign-ins в Supabase Auth или войди через email.");
     console.warn("Anonymous auth unavailable.", error);
     return false;
@@ -844,11 +862,16 @@ function renderProfile(message = "") {
   if (elements.sideUserSubtitle) elements.sideUserSubtitle.textContent = subtitle;
   if (elements.profileTelegramId) elements.profileTelegramId.textContent = telegram.telegram_id || profile.telegramId || "не передан";
   if (elements.profileSupabaseId) elements.profileSupabaseId.textContent = currentUser?.id ? `${currentUser.id.slice(0, 8)}...` : "нет входа";
+  if (elements.profileDriverLabel) elements.profileDriverLabel.textContent = displayName;
+  if (elements.profileCarLabel) {
+    const carTitle = [profile.carBrand, profile.carModel, profile.carYear].filter(Boolean).join(" ");
+    elements.profileCarLabel.textContent = carTitle || "Авто не указано";
+  }
 
   if (elements.authStatusTitle) {
     elements.authStatusTitle.textContent = currentUser
       ? currentUser.is_anonymous
-        ? "Гость в Supabase"
+        ? "Профиль подключен"
         : "Аккаунт подключен"
       : authReady
         ? "Вход не выполнен"
@@ -856,12 +879,13 @@ function renderProfile(message = "") {
   }
   if (elements.authStatusText) {
     elements.authStatusText.textContent = currentUser
-      ? "Новые смены, расходы и настройки будут сохраняться с привязкой к этому пользователю."
-      : "Включи Auth в Supabase или войди через email, чтобы данные были персональными.";
+      ? "Смены, расходы и настройки сохраняются в твоем аккаунте."
+      : "Войди, чтобы приложение могло вести персональную статистику.";
   }
   if (elements.authMessage && message) elements.authMessage.textContent = message;
   if (elements.profileSaveStatus && message) elements.profileSaveStatus.textContent = message;
   fillProfileForm();
+  updateAccessFlow();
 }
 
 function onboardingSequence() {
@@ -875,7 +899,7 @@ function currentOnboardingStep() {
 }
 
 function shouldShowOnboarding() {
-  return authReady && !userProfile.onboardingCompleted;
+  return authReady && Boolean(currentUser) && !userProfile.onboardingCompleted;
 }
 
 function setOnboardingOpen(isOpen) {
@@ -1005,6 +1029,9 @@ async function finishOnboarding() {
   clearOnboardingDraft();
   renderProfile("Регистрация завершена. Профиль сохранен.");
   renderOnboarding();
+  setView("home");
+  history.replaceState(null, "", "#home");
+  renderAll();
 }
 
 function nextOnboardingStep() {
@@ -2856,6 +2883,12 @@ elements.profileButton?.addEventListener("click", () => {
   history.replaceState(null, "", "#profile");
 });
 
+elements.authStartButton?.addEventListener("click", async () => {
+  if (elements.authMessage) elements.authMessage.textContent = "Создаем безопасную сессию...";
+  const ok = await signInAnonymously();
+  if (ok && elements.authMessage) elements.authMessage.textContent = "Готово. Теперь заполни профиль водителя.";
+});
+
 elements.authForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const client = createAuthClient();
@@ -2890,7 +2923,11 @@ elements.signOutButton?.addEventListener("click", async () => {
   await client.auth.signOut();
   currentSession = null;
   currentUser = null;
-  renderProfile("Вы вышли из Supabase. Данные останутся локально на устройстве.");
+  userProfile = {};
+  clearOnboardingDraft();
+  writeStorage(JSON.stringify(userProfile), PROFILE_STORAGE_KEY);
+  renderProfile("Вы вышли из аккаунта.");
+  updateAccessFlow();
   setSyncStatus("Вход отключен: работаем с локальной копией.");
 });
 
@@ -3372,6 +3409,7 @@ preventAccidentalZoom();
 updateDayPickerVisibility();
 setView(location.hash.replace("#", ""));
 renderCsvSyncStatus();
+updateAccessFlow();
 renderAll();
 initializeAuth().then(async (isSignedIn) => {
   renderProfile();
