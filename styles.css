@@ -73,6 +73,10 @@ body.telegram-mini-app select {
   user-select: text;
 }
 
+body.onboarding-open {
+  overflow: hidden;
+}
+
 body.telegram-mini-app .app-shell {
   height: var(--tg-viewport-height);
   overflow-x: hidden;
@@ -117,6 +121,158 @@ a {
   width: min(1440px, 100%);
   margin: 0 auto;
   padding: 14px;
+}
+
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: max(18px, env(safe-area-inset-top, 0px)) 16px max(18px, env(safe-area-inset-bottom, 0px));
+  background:
+    radial-gradient(circle at 18% 12%, rgba(40, 242, 156, 0.18), transparent 28rem),
+    radial-gradient(circle at 88% 18%, rgba(74, 168, 255, 0.16), transparent 24rem),
+    rgba(4, 7, 12, 0.88);
+  backdrop-filter: blur(22px);
+}
+
+.onboarding-overlay[hidden] {
+  display: none;
+}
+
+.onboarding-card {
+  width: min(720px, 100%);
+  max-height: min(820px, calc(100vh - 28px));
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 28px;
+  padding: clamp(18px, 4vw, 30px);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.045)),
+    rgba(24, 29, 40, 0.96);
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.11);
+}
+
+.onboarding-progress {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  margin-bottom: 22px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.onboarding-progress span {
+  display: block;
+  width: 8%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--profit), var(--blue));
+  transition: width 0.2s ease;
+}
+
+.onboarding-step {
+  display: none;
+  gap: 16px;
+}
+
+.onboarding-step.active {
+  display: grid;
+}
+
+.onboarding-step h1,
+.onboarding-step h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(2rem, 7vw, 3.4rem);
+  line-height: 1.05;
+}
+
+.onboarding-step p {
+  max-width: 560px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.02rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.onboarding-logo {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border: 1px solid rgba(40, 242, 156, 0.25);
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgba(40, 242, 156, 0.16), rgba(74, 168, 255, 0.08)),
+    rgba(255, 255, 255, 0.08);
+  font-size: 2.1rem;
+}
+
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.choice-grid.multi {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.choice-grid button {
+  min-height: 76px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.065);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 950;
+}
+
+.choice-grid button.active {
+  border-color: rgba(40, 242, 156, 0.5);
+  background:
+    linear-gradient(145deg, rgba(40, 242, 156, 0.22), rgba(74, 168, 255, 0.12)),
+    rgba(40, 242, 156, 0.09);
+  color: var(--profit);
+  box-shadow: 0 0 0 4px rgba(40, 242, 156, 0.08);
+}
+
+.onboarding-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.onboarding-form-grid select,
+.onboarding-form-grid input {
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 900;
+  outline: none;
+}
+
+.onboarding-form-grid select:focus,
+.onboarding-form-grid input:focus {
+  border-color: rgba(40, 242, 156, 0.42);
+  box-shadow: 0 0 0 4px rgba(40, 242, 156, 0.1);
+}
+
+.onboarding-actions {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.35fr) 1fr;
+  gap: 10px;
+  margin-top: 18px;
 }
 
 .topbar {
@@ -2576,9 +2732,19 @@ h2 {
   .data-grid,
   .profile-grid,
   .profile-form-grid,
+  .onboarding-form-grid,
   .data-intro,
   .finish-grid,
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .choice-grid,
+  .choice-grid.multi {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-actions {
     grid-template-columns: 1fr;
   }
 

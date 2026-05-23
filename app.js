@@ -5,7 +5,24 @@ const GOAL_STORAGE_KEY = "taxiProfit.weeklyGoal.v1";
 const LEGACY_GOAL_STORAGE_KEY = "taxiProfit.monthGoal.v1";
 const ACTIVE_SHIFT_STORAGE_KEY = "taxiProfit.activeShift.v1";
 const PROFILE_STORAGE_KEY = "taxiProfit.profile.v1";
+const ONBOARDING_DRAFT_STORAGE_KEY = "taxiProfit.onboardingDraft.v1";
 const DEFAULT_WEEKLY_GOAL = 10000;
+const ONBOARDING_STEPS = ["welcome", "carType", "vehicle", "rent", "platforms"];
+const CAR_CATALOG = {
+  Toyota: ["Prius", "Camry", "Corolla", "RAV4", "Auris", "Другое"],
+  Hyundai: ["Elantra", "Sonata", "Ioniq", "Accent", "Tucson", "Другое"],
+  Kia: ["Ceed", "Optima", "K5", "Rio", "Niro", "Другое"],
+  Renault: ["Logan", "Megane", "Fluence", "Duster", "Другое"],
+  Skoda: ["Octavia", "Rapid", "Fabia", "Superb", "Другое"],
+  Volkswagen: ["Jetta", "Passat", "Golf", "Polo", "Другое"],
+  Nissan: ["Leaf", "Rogue", "Qashqai", "Sentra", "Другое"],
+  Chevrolet: ["Lacetti", "Cruze", "Aveo", "Volt", "Другое"],
+  Ford: ["Focus", "Fusion", "Mondeo", "C-Max", "Другое"],
+  Tesla: ["Model 3", "Model Y", "Model S", "Другое"],
+  BYD: ["Dolphin", "Qin", "Song", "Seal", "Другое"],
+  Другое: ["Другое"],
+};
+const CAR_YEAR_START = 1995;
 const SUPABASE_URL = "https://aqogfuzhjqbsanaovcox.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HHwwAnF8AfI0IW1CdlROtg_sOjD-Wl_";
 const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
@@ -198,6 +215,16 @@ const elements = {
   profileTelegramId: document.querySelector("#profileTelegramId"),
   profileSupabaseId: document.querySelector("#profileSupabaseId"),
   profileSaveStatus: document.querySelector("#profileSaveStatus"),
+  onboardingOverlay: document.querySelector("#onboardingOverlay"),
+  onboardingProgress: document.querySelector("#onboardingProgress"),
+  onboardingSteps: document.querySelectorAll("[data-onboarding-step]"),
+  onboardingStart: document.querySelector("#onboardingStart"),
+  onboardingBack: document.querySelector("#onboardingBack"),
+  onboardingNext: document.querySelector("#onboardingNext"),
+  onboardingChoiceButtons: document.querySelectorAll("[data-choice-group] button"),
+  onboardingCarBrand: document.querySelector("#onboardingCarBrand"),
+  onboardingCarModel: document.querySelector("#onboardingCarModel"),
+  onboardingCarYear: document.querySelector("#onboardingCarYear"),
 };
 
 let shifts = loadShifts();
@@ -224,6 +251,8 @@ let currentSession = null;
 let currentUser = null;
 let userProfile = loadLocalProfile();
 let authReady = false;
+let onboardingStepIndex = 0;
+let onboardingDraft = loadOnboardingDraft();
 
 function loadShifts() {
   const saved = readStorage();
@@ -324,6 +353,31 @@ function loadLocalProfile() {
 function saveLocalProfile(profile) {
   userProfile = { ...userProfile, ...(profile || {}) };
   writeStorage(JSON.stringify(userProfile), PROFILE_STORAGE_KEY);
+}
+
+function loadOnboardingDraft() {
+  const saved = readStorage(ONBOARDING_DRAFT_STORAGE_KEY);
+  if (!saved) return {};
+
+  try {
+    const parsed = JSON.parse(saved);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveOnboardingDraft() {
+  writeStorage(JSON.stringify(onboardingDraft), ONBOARDING_DRAFT_STORAGE_KEY);
+}
+
+function clearOnboardingDraft() {
+  onboardingDraft = {};
+  try {
+    localStorage.removeItem(ONBOARDING_DRAFT_STORAGE_KEY);
+  } catch {
+    writeStorage("", ONBOARDING_DRAFT_STORAGE_KEY);
+  }
 }
 
 function saveCsvSyncMeta(type, count) {
@@ -527,6 +581,7 @@ function createAuthClient() {
     currentUser = session?.user || null;
     authReady = true;
     renderProfile();
+    renderOnboarding();
     if (currentUser) {
       await ensureUserProfile();
       await loadCloudData({ applyEmpty: true, silent: true });
@@ -544,6 +599,7 @@ async function initializeAuth() {
   if (!client) {
     authReady = true;
     renderProfile();
+    renderOnboarding();
     setSyncStatus("Supabase Auth недоступен: работаем локально.");
     return false;
   }
@@ -559,11 +615,13 @@ async function initializeAuth() {
       authReady = true;
       await ensureUserProfile();
       renderProfile();
+      renderOnboarding();
     }
     return Boolean(currentUser);
   } catch (error) {
     authReady = true;
     renderProfile();
+    renderOnboarding();
     setSyncStatus("Auth не подключился. Проверь настройки Supabase Auth.");
     console.warn("Supabase Auth unavailable.", error);
     return false;
@@ -592,10 +650,12 @@ async function signInAnonymously() {
     authReady = true;
     await ensureUserProfile();
     renderProfile();
+    renderOnboarding();
     return Boolean(currentUser);
   } catch (error) {
     authReady = true;
     renderProfile();
+    renderOnboarding();
     setSyncStatus("Включи Anonymous sign-ins в Supabase Auth или войди через email.");
     console.warn("Anonymous auth unavailable.", error);
     return false;
@@ -609,13 +669,24 @@ function profileFromSupabase(row = {}) {
     telegramUsername: row.telegram_username || "",
     displayName: row.display_name || "",
     driverName: row.driver_name || "",
+    carOwnership: row.car_ownership || "",
+    carBrand: row.car_brand || "",
     carModel: row.car_model || "",
+    carYear: row.car_year || "",
+    fuelType: row.fuel_type || "",
+    fuelConsumption: row.fuel_consumption || "",
+    odometer: row.odometer || "",
     carNumber: row.car_number || "",
     defaultPlatform: row.default_platform || "Bolt",
+    rentAmount: row.rent_amount || "",
+    rentFrequency: row.rent_frequency || "",
+    rentPaymentDay: row.rent_payment_day || "",
+    platforms: Array.isArray(row.platforms) ? row.platforms : [],
     phone: row.phone || "",
     city: row.city || "",
     avatarUrl: row.avatar_url || "",
     weeklyGoal: Number(row.weekly_goal || weeklyGoal || DEFAULT_WEEKLY_GOAL),
+    onboardingCompleted: Boolean(row.onboarding_completed),
   };
 }
 
@@ -627,13 +698,24 @@ function profileToSupabasePayload(profile = userProfile) {
     telegram_username: telegram.telegram_username || profile.telegramUsername || "",
     display_name: profile.displayName || profile.driverName || telegram.display_name || "",
     driver_name: profile.driverName || profile.displayName || telegram.display_name || "",
+    car_ownership: profile.carOwnership || "",
+    car_brand: profile.carBrand || "",
     car_model: profile.carModel || "",
+    car_year: Number(profile.carYear || 0) || null,
+    fuel_type: profile.fuelType || "",
+    fuel_consumption: Number(profile.fuelConsumption || 0) || null,
+    odometer: Number(profile.odometer || 0) || null,
     car_number: profile.carNumber || "",
     default_platform: profile.defaultPlatform || selectedRunnerPlatform || "Bolt",
+    rent_amount: Number(profile.rentAmount || 0) || null,
+    rent_frequency: profile.rentFrequency || "",
+    rent_payment_day: profile.rentPaymentDay || "",
+    platforms: Array.isArray(profile.platforms) ? profile.platforms : [],
     phone: profile.phone || "",
     city: profile.city || "",
     avatar_url: telegram.avatar_url || profile.avatarUrl || "",
     weekly_goal: Number(profile.weeklyGoal || weeklyGoal || DEFAULT_WEEKLY_GOAL),
+    onboarding_completed: Boolean(profile.onboardingCompleted),
   };
 }
 
@@ -650,6 +732,8 @@ async function ensureUserProfile() {
       if (userProfile.defaultPlatform) selectedRunnerPlatform = userProfile.defaultPlatform;
       if (Number(userProfile.weeklyGoal) > 0) saveWeeklyGoal(Number(userProfile.weeklyGoal));
       renderProfile();
+      fillOnboardingInputs();
+      renderOnboarding();
       return true;
     }
 
@@ -662,10 +746,14 @@ async function ensureUserProfile() {
     });
     saveLocalProfile(profileFromSupabase(created));
     renderProfile();
+    fillOnboardingInputs();
+    renderOnboarding();
     return true;
   } catch (error) {
     console.warn("Profile is unavailable, using local profile.", error);
     renderProfile();
+    fillOnboardingInputs();
+    renderOnboarding();
     return false;
   }
 }
@@ -680,6 +768,7 @@ async function saveUserProfile(profile) {
 
   if (!hasCloudStorage() || !getCurrentUserId()) {
     renderProfile("Профиль сохранен локально.");
+    renderOnboarding();
     return false;
   }
 
@@ -697,10 +786,12 @@ async function saveUserProfile(profile) {
       });
     }
     renderProfile("Профиль сохранен в Supabase.");
+    renderOnboarding();
     return true;
   } catch (error) {
     console.warn("Profile was saved locally but not synced.", error);
     renderProfile("Профиль сохранен локально, Supabase пока не принял изменения.");
+    renderOnboarding();
     return false;
   }
 }
@@ -711,6 +802,7 @@ function readProfileForm() {
   return {
     driverName: String(data.get("driverName") || "").trim(),
     city: String(data.get("city") || "").trim(),
+    carBrand: String(data.get("carBrand") || "").trim(),
     carModel: String(data.get("carModel") || "").trim(),
     carNumber: String(data.get("carNumber") || "").trim(),
     defaultPlatform: String(data.get("defaultPlatform") || "Bolt"),
@@ -724,6 +816,7 @@ function fillProfileForm() {
   const profile = { ...userProfile };
   elements.profileForm.elements.driverName.value = profile.driverName || profile.displayName || telegramDisplayName() || "";
   elements.profileForm.elements.city.value = profile.city || "";
+  elements.profileForm.elements.carBrand.value = profile.carBrand || "";
   elements.profileForm.elements.carModel.value = profile.carModel || "";
   elements.profileForm.elements.carNumber.value = profile.carNumber || "";
   elements.profileForm.elements.defaultPlatform.value = profile.defaultPlatform || selectedRunnerPlatform || "Bolt";
@@ -769,6 +862,167 @@ function renderProfile(message = "") {
   if (elements.authMessage && message) elements.authMessage.textContent = message;
   if (elements.profileSaveStatus && message) elements.profileSaveStatus.textContent = message;
   fillProfileForm();
+}
+
+function onboardingSequence() {
+  const ownership = onboardingDraft.carOwnership || userProfile.carOwnership || "";
+  if (ownership === "rent" || ownership === "fleet") return ONBOARDING_STEPS;
+  return ONBOARDING_STEPS.filter((step) => step !== "rent");
+}
+
+function currentOnboardingStep() {
+  return onboardingSequence()[onboardingStepIndex] || "welcome";
+}
+
+function shouldShowOnboarding() {
+  return authReady && !userProfile.onboardingCompleted;
+}
+
+function setOnboardingOpen(isOpen) {
+  if (!elements.onboardingOverlay) return;
+  elements.onboardingOverlay.hidden = !isOpen;
+  document.body.classList.toggle("onboarding-open", isOpen);
+}
+
+function updateChoiceButtons() {
+  elements.onboardingChoiceButtons.forEach((button) => {
+    const group = button.closest("[data-choice-group]")?.dataset.choiceGroup;
+    const value = button.dataset.choiceValue;
+    if (group === "platforms") {
+      button.classList.toggle("active", (onboardingDraft.platforms || []).includes(value));
+      return;
+    }
+    button.classList.toggle("active", onboardingDraft[group] === value);
+  });
+}
+
+function fillSelect(select, options, selectedValue = "") {
+  if (!select) return;
+  const currentValue = selectedValue || select.value;
+  select.innerHTML = options.map((option) => {
+    const value = typeof option === "object" ? option.value : option;
+    const label = typeof option === "object" ? option.label : option;
+    return `<option value="${String(value)}">${String(label)}</option>`;
+  }).join("");
+  if (currentValue && [...select.options].some((option) => option.value === String(currentValue))) {
+    select.value = String(currentValue);
+  }
+}
+
+function carYearOptions() {
+  const currentYear = new Date().getFullYear() + 1;
+  const years = [];
+  for (let year = currentYear; year >= CAR_YEAR_START; year -= 1) years.push(String(year));
+  return years;
+}
+
+function updateCarModelOptions() {
+  const brand = elements.onboardingCarBrand?.value || onboardingDraft.carBrand || userProfile.carBrand || "Toyota";
+  const models = CAR_CATALOG[brand] || CAR_CATALOG["Другое"];
+  fillSelect(elements.onboardingCarModel, models, onboardingDraft.carModel || userProfile.carModel || models[0]);
+}
+
+function setupOnboardingSelects() {
+  fillSelect(elements.onboardingCarBrand, Object.keys(CAR_CATALOG), onboardingDraft.carBrand || userProfile.carBrand || "Toyota");
+  updateCarModelOptions();
+  fillSelect(elements.onboardingCarYear, carYearOptions(), onboardingDraft.carYear || userProfile.carYear || "2020");
+}
+
+function renderOnboarding() {
+  if (!elements.onboardingOverlay) return;
+  const show = shouldShowOnboarding();
+  setOnboardingOpen(show);
+  if (!show) return;
+
+  setupOnboardingSelects();
+  const sequence = onboardingSequence();
+  if (onboardingStepIndex >= sequence.length) onboardingStepIndex = sequence.length - 1;
+  const step = currentOnboardingStep();
+  elements.onboardingSteps.forEach((item) => {
+    item.classList.toggle("active", item.dataset.onboardingStep === step);
+  });
+  if (elements.onboardingProgress) {
+    const progress = step === "welcome" ? 8 : ((onboardingStepIndex + 1) / sequence.length) * 100;
+    elements.onboardingProgress.style.width = `${Math.max(8, Math.min(100, progress))}%`;
+  }
+  if (elements.onboardingBack) elements.onboardingBack.hidden = step === "welcome";
+  if (elements.onboardingNext) {
+    elements.onboardingNext.textContent = step === "platforms" ? "Завершить" : "Далее";
+    elements.onboardingNext.hidden = step === "welcome";
+  }
+  updateChoiceButtons();
+}
+
+function readOnboardingInputs() {
+  const root = elements.onboardingOverlay;
+  if (!root) return;
+  const numberValue = (name) => Number(root.querySelector(`[name="${name}"]`)?.value || 0) || "";
+  const textValue = (name) => String(root.querySelector(`[name="${name}"]`)?.value || "").trim();
+
+  onboardingDraft = {
+    ...onboardingDraft,
+    carBrand: textValue("carBrand"),
+    carModel: textValue("carModel"),
+    carYear: numberValue("carYear"),
+    fuelType: textValue("fuelType") || "Бензин",
+    fuelConsumption: numberValue("fuelConsumption"),
+    odometer: numberValue("odometer"),
+    rentAmount: numberValue("rentAmount"),
+    rentFrequency: textValue("rentFrequency"),
+    rentPaymentDay: textValue("rentPaymentDay"),
+  };
+  saveOnboardingDraft();
+}
+
+function fillOnboardingInputs() {
+  const root = elements.onboardingOverlay;
+  if (!root) return;
+  const source = { ...userProfile, ...onboardingDraft };
+  ["carBrand", "carModel", "carYear", "fuelType", "fuelConsumption", "odometer", "rentAmount", "rentFrequency", "rentPaymentDay"].forEach((name) => {
+    const input = root.querySelector(`[name="${name}"]`);
+    if (input && source[name] !== undefined && source[name] !== null) input.value = source[name];
+  });
+}
+
+function validateOnboardingStep() {
+  const step = currentOnboardingStep();
+  if (step === "carType" && !onboardingDraft.carOwnership) return "Выбери тип авто.";
+  if (step === "platforms" && !(onboardingDraft.platforms || []).length) return "Выбери хотя бы один агрегатор.";
+  return "";
+}
+
+async function finishOnboarding() {
+  readOnboardingInputs();
+  const platforms = onboardingDraft.platforms?.length ? onboardingDraft.platforms : ["Bolt"];
+  const nextProfile = {
+    ...userProfile,
+    ...onboardingDraft,
+    platforms,
+    defaultPlatform: userProfile.defaultPlatform || platforms[0],
+    onboardingCompleted: true,
+  };
+  await saveUserProfile(nextProfile);
+  clearOnboardingDraft();
+  renderProfile("Регистрация завершена. Профиль сохранен.");
+  renderOnboarding();
+}
+
+function nextOnboardingStep() {
+  readOnboardingInputs();
+  const validationMessage = validateOnboardingStep();
+  if (validationMessage) {
+    if (elements.profileSaveStatus) elements.profileSaveStatus.textContent = validationMessage;
+    return;
+  }
+
+  const sequence = onboardingSequence();
+  if (currentOnboardingStep() === "platforms") {
+    finishOnboarding();
+    return;
+  }
+  onboardingStepIndex = Math.min(onboardingStepIndex + 1, sequence.length - 1);
+  fillOnboardingInputs();
+  renderOnboarding();
 }
 
 async function cloudRequest(path, options = {}) {
@@ -2644,6 +2898,68 @@ elements.profileForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   await saveUserProfile(readProfileForm());
   renderAll();
+});
+
+elements.onboardingStart?.addEventListener("click", () => {
+  onboardingStepIndex = 1;
+  renderOnboarding();
+});
+
+elements.onboardingBack?.addEventListener("click", () => {
+  readOnboardingInputs();
+  onboardingStepIndex = Math.max(0, onboardingStepIndex - 1);
+  fillOnboardingInputs();
+  renderOnboarding();
+});
+
+elements.onboardingNext?.addEventListener("click", () => {
+  nextOnboardingStep();
+});
+
+elements.onboardingCarBrand?.addEventListener("change", () => {
+  onboardingDraft.carBrand = elements.onboardingCarBrand.value;
+  onboardingDraft.carModel = "";
+  updateCarModelOptions();
+  onboardingDraft.carModel = elements.onboardingCarModel?.value || "";
+  saveOnboardingDraft();
+});
+
+elements.onboardingCarModel?.addEventListener("change", () => {
+  onboardingDraft.carModel = elements.onboardingCarModel.value;
+  saveOnboardingDraft();
+});
+
+elements.onboardingCarYear?.addEventListener("change", () => {
+  onboardingDraft.carYear = elements.onboardingCarYear.value;
+  saveOnboardingDraft();
+});
+
+elements.onboardingChoiceButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const group = button.closest("[data-choice-group]")?.dataset.choiceGroup;
+    const value = button.dataset.choiceValue;
+    if (!group || !value) return;
+
+    if (group === "platforms") {
+      const current = new Set(onboardingDraft.platforms || []);
+      if (current.has(value)) {
+        current.delete(value);
+      } else {
+        current.add(value);
+      }
+      onboardingDraft.platforms = [...current];
+    } else {
+      onboardingDraft[group] = value;
+      if (group === "carOwnership" && value === "own") {
+        onboardingDraft.rentAmount = "";
+        onboardingDraft.rentFrequency = "";
+        onboardingDraft.rentPaymentDay = "";
+      }
+    }
+
+    saveOnboardingDraft();
+    updateChoiceButtons();
+  });
 });
 
 function setView(view) {

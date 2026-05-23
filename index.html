@@ -5,9 +5,124 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TaxiProfit</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=auth-profile-1" />
+    <link rel="stylesheet" href="styles.css?v=onboarding-1" />
   </head>
   <body>
+    <section class="onboarding-overlay" id="onboardingOverlay" hidden aria-label="Регистрация водителя">
+      <div class="onboarding-card">
+        <div class="onboarding-progress" aria-hidden="true">
+          <span id="onboardingProgress"></span>
+        </div>
+
+        <div class="onboarding-step active" data-onboarding-step="welcome">
+          <div class="onboarding-logo" aria-hidden="true">🚖</div>
+          <span class="section-kicker">TaxiProfit</span>
+          <h1>Добро пожаловать</h1>
+          <p>Настроим профиль водителя, авто и рабочие агрегаторы, чтобы аналитика считала прибыль честно.</p>
+          <button class="submit-button" type="button" id="onboardingStart">Начать</button>
+        </div>
+
+        <div class="onboarding-step" data-onboarding-step="carType">
+          <span class="section-kicker">Шаг 1</span>
+          <h2>На каком авто вы работаете?</h2>
+          <div class="choice-grid" data-choice-group="carOwnership">
+            <button type="button" data-choice-value="own">Собственное авто</button>
+            <button type="button" data-choice-value="rent">Арендованное авто</button>
+            <button type="button" data-choice-value="fleet">Авто агрегатора / парка</button>
+          </div>
+        </div>
+
+        <div class="onboarding-step" data-onboarding-step="vehicle">
+          <span class="section-kicker">Шаг 2</span>
+          <h2>Данные авто</h2>
+          <div class="form-grid onboarding-form-grid">
+            <label>
+              Марка авто
+              <select name="carBrand" id="onboardingCarBrand"></select>
+            </label>
+            <label>
+              Модель
+              <select name="carModel" id="onboardingCarModel"></select>
+            </label>
+            <label>
+              Год
+              <select name="carYear" id="onboardingCarYear"></select>
+            </label>
+            <label>
+              Тип топлива
+              <select name="fuelType">
+                <option value="Бензин">Бензин</option>
+                <option value="Дизель">Дизель</option>
+                <option value="Газ">Газ</option>
+                <option value="Гибрид">Гибрид</option>
+                <option value="Электро">Электро</option>
+              </select>
+            </label>
+            <label>
+              Средний расход, л/100км
+              <input name="fuelConsumption" type="number" min="0" step="0.1" placeholder="6.5" />
+            </label>
+            <label>
+              Текущий пробег
+              <input name="odometer" type="number" min="0" step="0.1" placeholder="125430" />
+            </label>
+          </div>
+        </div>
+
+        <div class="onboarding-step" data-onboarding-step="rent">
+          <span class="section-kicker">Шаг 3</span>
+          <h2>Условия аренды</h2>
+          <p>Эти данные потом будут использоваться в аналитике прибыли.</p>
+          <div class="form-grid onboarding-form-grid">
+            <label>
+              Стоимость аренды, ₴
+              <input name="rentAmount" type="number" min="0" step="1" placeholder="6300" />
+            </label>
+            <label>
+              Частота оплаты
+              <select name="rentFrequency">
+                <option value="day">Сутки</option>
+                <option value="week">Неделя</option>
+                <option value="month">Месяц</option>
+              </select>
+            </label>
+            <label class="wide-field">
+              День оплаты аренды
+              <select name="rentPaymentDay">
+                <option value="daily">Каждый день</option>
+                <option value="monday">Понедельник</option>
+                <option value="tuesday">Вторник</option>
+                <option value="wednesday">Среда</option>
+                <option value="thursday">Четверг</option>
+                <option value="friday">Пятница</option>
+                <option value="saturday">Суббота</option>
+                <option value="sunday">Воскресенье</option>
+                <option value="month_1">1 число месяца</option>
+                <option value="month_15">15 число месяца</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="onboarding-step" data-onboarding-step="platforms">
+          <span class="section-kicker">Шаг 4</span>
+          <h2>С какими агрегаторами вы работаете?</h2>
+          <div class="choice-grid multi" data-choice-group="platforms">
+            <button type="button" data-choice-value="Bolt">Bolt</button>
+            <button type="button" data-choice-value="Uklon">Uklon</button>
+            <button type="button" data-choice-value="InDrive">InDrive</button>
+            <button type="button" data-choice-value="Uber">Uber</button>
+            <button type="button" data-choice-value="Другое">Другое</button>
+          </div>
+        </div>
+
+        <div class="onboarding-actions">
+          <button class="ghost-button" type="button" id="onboardingBack">Назад</button>
+          <button class="submit-button" type="button" id="onboardingNext">Далее</button>
+        </div>
+      </div>
+    </section>
+
     <div class="app-shell">
       <header class="topbar">
         <button class="brand" type="button" id="menuToggle" aria-label="Открыть меню" aria-controls="sideMenu" aria-expanded="false">
@@ -709,12 +824,12 @@
                 <input name="city" type="text" placeholder="Киев" />
               </label>
               <label>
-                Автомобиль
-                <input name="carModel" type="text" placeholder="Toyota Prius" />
+                Марка авто
+                <input name="carBrand" type="text" placeholder="Toyota" />
               </label>
               <label>
-                Номер авто
-                <input name="carNumber" type="text" placeholder="AA 0000 AA" />
+                Модель
+                <input name="carModel" type="text" placeholder="Prius" />
               </label>
               <label>
                 Основная платформа
@@ -727,6 +842,10 @@
               <label>
                 Телефон
                 <input name="phone" type="tel" autocomplete="tel" placeholder="+380..." />
+              </label>
+              <label>
+                Номер авто
+                <input name="carNumber" type="text" placeholder="AA 0000 AA" />
               </label>
               <label class="wide-field">
                 Недельная цель, ₴
@@ -742,6 +861,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=auth-profile-1"></script>
+    <script src="app.js?v=onboarding-1"></script>
   </body>
 </html>
