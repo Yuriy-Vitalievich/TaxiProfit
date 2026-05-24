@@ -1184,8 +1184,10 @@ async function loadCloudData({ applyEmpty = false, silent = false } = {}) {
     const cloudShifts = (shiftResult || []).map(normalizeCloudShift);
     const cloudExpenses = (expenseResult || []).map(normalizeCloudExpense);
     const hasCloudRows = cloudShifts.length || cloudExpenses.length;
+    const hasLocalRows = shifts.length || expenses.length;
+    const canApplyEmptyCloud = applyEmpty && !hasLocalRows;
 
-    if (hasCloudRows || applyEmpty || cloudLoadedOnce) {
+    if (hasCloudRows || canApplyEmptyCloud || (cloudLoadedOnce && !hasLocalRows)) {
       shifts = cloudShifts;
       expenses = cloudExpenses;
       selectedDay = latestDataDate();
