@@ -1,0 +1,16 @@
+{
+  "appId": "app.taxiprofit.driver",
+  "appName": "TaxiProfit",
+  "webDir": ".",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "backgroundColor": "#07100f",
+      "androidSplashResourceName": "splash",
+      "showSpinner": false
+    }
+  }
+}

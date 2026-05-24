@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.6.0 - Mobile App Foundation
+
+### Добавлено
+
+- PWA manifest для установки TaxiProfit на главный экран телефона.
+- Service worker для кеширования app shell и более стабильного запуска.
+- Иконка приложения в стиле TaxiProfit.
+- Базовая Capacitor-конфигурация для будущей сборки Android/iOS приложения.
+- Документация `MOBILE_APP_SETUP.md` с вариантами установки и сборки.
+
 ## v0.5.1 - Telegram ID Login
 
 ### Улучшено

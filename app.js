@@ -560,6 +560,17 @@ function preventAccidentalZoom() {
   );
 }
 
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  if (location.protocol === "file:") return;
+
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch((error) => {
+      console.warn("Service worker registration failed.", error);
+    });
+  });
+}
+
 function getAuthToken() {
   return currentSession?.access_token || SUPABASE_PUBLISHABLE_KEY;
 }
@@ -3419,6 +3430,7 @@ resetExpenseForm();
 renderShiftRunner();
 if (elements.dayPicker) elements.dayPicker.value = selectedDay;
 setupTelegramMiniApp();
+registerServiceWorker();
 preventAccidentalZoom();
 updateDayPickerVisibility();
 setView(location.hash.replace("#", ""));
