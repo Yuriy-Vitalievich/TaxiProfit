@@ -587,6 +587,35 @@ function getCloudOwnerUserId() {
   return userProfile.userId || getCurrentUserId();
 }
 
+function getCloudOwnerTelegramId() {
+  return getTelegramId();
+}
+
+function cloudOwnerPayload() {
+  return {
+    user_id: getCloudOwnerUserId(),
+    telegram_id: getCloudOwnerTelegramId(),
+  };
+}
+
+function cloudOwnerQuery() {
+  const telegramId = getCloudOwnerTelegramId();
+  const userId = getCloudOwnerUserId();
+  if (telegramId && userId) {
+    return `or=(telegram_id.eq.${encodeURIComponent(telegramId)},user_id.eq.${encodeURIComponent(userId)})`;
+  }
+  if (telegramId) return `telegram_id=eq.${encodeURIComponent(telegramId)}`;
+  if (userId) return `user_id=eq.${encodeURIComponent(userId)}`;
+  return "";
+}
+
+function cloudOwnerRealtimeFilter() {
+  const telegramId = getCloudOwnerTelegramId();
+  if (telegramId) return `telegram_id=eq.${telegramId}`;
+  const userId = getCloudOwnerUserId();
+  return userId ? `user_id=eq.${userId}` : "";
+}
+
 function setAuthGateOpen(isOpen) {
   if (!elements.authOverlay) return;
   elements.authOverlay.hidden = !isOpen;
@@ -617,6 +646,7 @@ function createAuthClient() {
     renderProfile();
     updateAccessFlow();
     if (currentUser) {
+      await syncTelegramAuthMetadata();
       await ensureUserProfile();
       await loadCloudData({ applyEmpty: true, silent: true });
       await loadCloudSettings();
@@ -647,6 +677,7 @@ async function initializeAuth() {
       await signInAnonymously();
     } else {
       authReady = true;
+      await syncTelegramAuthMetadata();
       await ensureUserProfile();
       renderProfile();
       updateAccessFlow();
@@ -658,6 +689,37 @@ async function initializeAuth() {
     updateAccessFlow();
     setSyncStatus("Auth не подключился. Проверь настройки Supabase Auth.");
     console.warn("Supabase Auth unavailable.", error);
+    return false;
+  }
+}
+
+async function syncTelegramAuthMetadata() {
+  const client = createAuthClient();
+  const telegram = telegramProfilePayload();
+  if (!client || !currentUser || !telegram.telegram_id) return false;
+
+  const metadata = currentUser.user_metadata || {};
+  if (String(metadata.telegram_id || "") === String(telegram.telegram_id)) return true;
+
+  try {
+    const { data, error } = await client.auth.updateUser({
+      data: {
+        telegram_id: String(telegram.telegram_id),
+        telegram_username: telegram.telegram_username || "",
+        display_name: telegram.display_name || "",
+        avatar_url: telegram.avatar_url || "",
+      },
+    });
+    if (error) throw error;
+    currentUser = data?.user || currentUser;
+    const refreshed = await client.auth.refreshSession();
+    if (refreshed?.data?.session) {
+      currentSession = refreshed.data.session;
+      currentUser = currentSession.user;
+    }
+    return true;
+  } catch (error) {
+    console.warn("Could not sync Telegram metadata with Supabase Auth.", error);
     return false;
   }
 }
@@ -1131,7 +1193,7 @@ function normalizeCloudExpense(row) {
 }
 
 function requireCloudUser() {
-  if (!getCloudOwnerUserId()) {
+  if (!getCloudOwnerTelegramId() && !getCloudOwnerUserId()) {
     setSyncStatus("Подключаем Telegram ID для персональной синхронизации.");
     return false;
   }
@@ -1142,8 +1204,9 @@ async function loadCloudSettings() {
   if (!hasCloudStorage() || !requireCloudUser()) return false;
 
   try {
+    const ownerQuery = cloudOwnerQuery();
     const [settings] = await cloudRequest("settings", {
-      query: `?user_id=eq.${encodeURIComponent(getCloudOwnerUserId())}&key=eq.dashboard&select=payload&limit=1`,
+      query: `?${ownerQuery}&key=eq.dashboard&select=payload&limit=1`,
     });
     const payload = settings?.payload || {};
     const legacyGoal = Number(payload.monthGoal);
@@ -1172,12 +1235,13 @@ async function loadCloudData({ applyEmpty = false, silent = false } = {}) {
   if (!requireCloudUser()) return false;
 
   try {
+    const ownerQuery = cloudOwnerQuery();
     const [shiftResult, expenseResult] = await Promise.all([
       cloudRequest("shifts", {
-        query: `?user_id=eq.${encodeURIComponent(getCloudOwnerUserId())}&select=id,payload&order=created_at.asc`,
+        query: `?${ownerQuery}&select=id,payload&order=created_at.asc`,
       }),
       cloudRequest("expenses", {
-        query: `?user_id=eq.${encodeURIComponent(getCloudOwnerUserId())}&select=id,payload&order=created_at.asc`,
+        query: `?${ownerQuery}&select=id,payload&order=created_at.asc`,
       }),
     ]);
 
@@ -1186,6 +1250,16 @@ async function loadCloudData({ applyEmpty = false, silent = false } = {}) {
     const hasCloudRows = cloudShifts.length || cloudExpenses.length;
     const hasLocalRows = shifts.length || expenses.length;
     const canApplyEmptyCloud = applyEmpty && !hasLocalRows;
+
+    if (!hasCloudRows && hasLocalRows && !cloudLoadedOnce) {
+      await Promise.all([
+        replaceCloudTable("shifts", shifts),
+        replaceCloudTable("expenses", expenses),
+      ]);
+      cloudLoadedOnce = true;
+      if (!silent) setSyncStatus("Локальные данные сохранены в Supabase для этого Telegram.");
+      return true;
+    }
 
     if (hasCloudRows || canApplyEmptyCloud || (cloudLoadedOnce && !hasLocalRows)) {
       shifts = cloudShifts;
@@ -1230,8 +1304,8 @@ function scheduleSettingsReload() {
 }
 
 function setupRealtimeSync({ includeSettings = false } = {}) {
-  const ownerUserId = getCloudOwnerUserId();
-  if (!hasRealtimeClient() || !ownerUserId) {
+  const realtimeFilter = cloudOwnerRealtimeFilter();
+  if (!hasRealtimeClient() || !realtimeFilter) {
     setSyncStatus("Supabase работает через REST. Для realtime нужен supabase-js CDN.");
     return;
   }
@@ -1239,16 +1313,16 @@ function setupRealtimeSync({ includeSettings = false } = {}) {
   realtimeClient = createAuthClient();
 
   const channel = realtimeClient
-    .channel(`taxiprofit-live-${ownerUserId}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "shifts", filter: `user_id=eq.${ownerUserId}` }, () => {
+    .channel(`taxiprofit-live-${realtimeFilter}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "shifts", filter: realtimeFilter }, () => {
       scheduleCloudReload("Смены обновлены в облаке.");
     })
-    .on("postgres_changes", { event: "*", schema: "public", table: "expenses", filter: `user_id=eq.${ownerUserId}` }, () => {
+    .on("postgres_changes", { event: "*", schema: "public", table: "expenses", filter: realtimeFilter }, () => {
       scheduleCloudReload("Расходы обновлены в облаке.");
     });
 
   if (includeSettings) {
-    channel.on("postgres_changes", { event: "*", schema: "public", table: "settings", filter: `user_id=eq.${ownerUserId}` }, () => {
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "settings", filter: realtimeFilter }, () => {
       scheduleSettingsReload();
     });
   }
@@ -1267,24 +1341,25 @@ function setupRealtimeSync({ includeSettings = false } = {}) {
 }
 
 async function saveSettingsToCloud() {
-  if (!hasCloudStorage() || !getCloudOwnerUserId()) return;
+  if (!hasCloudStorage() || !requireCloudUser()) return;
 
   try {
-    const ownerUserId = getCloudOwnerUserId();
+    const ownerQuery = cloudOwnerQuery();
+    const ownerPayload = cloudOwnerPayload();
     const [existing] = await cloudRequest("settings", {
-      query: `?user_id=eq.${encodeURIComponent(ownerUserId)}&key=eq.dashboard&select=id&limit=1`,
+      query: `?${ownerQuery}&key=eq.dashboard&select=id&limit=1`,
     });
     if (existing?.id) {
       await cloudRequest("settings", {
         method: "PATCH",
         query: `?id=eq.${encodeURIComponent(existing.id)}`,
-        body: { payload: { weeklyGoal }, user_id: ownerUserId },
+        body: { payload: { weeklyGoal }, ...ownerPayload },
       });
       return;
     }
     await cloudRequest("settings", {
       method: "POST",
-      body: { key: "dashboard", user_id: ownerUserId, payload: { weeklyGoal } },
+      body: { key: "dashboard", ...ownerPayload, payload: { weeklyGoal } },
     });
   } catch (error) {
     console.warn("Settings were saved locally but not synced to Supabase.", error);
@@ -1299,21 +1374,21 @@ function scheduleSettingsSave() {
 }
 
 async function saveShiftToCloud(shift) {
-  if (!hasCloudStorage() || !getCloudOwnerUserId()) return shift;
+  if (!hasCloudStorage() || !requireCloudUser()) return shift;
 
-  const ownerUserId = getCloudOwnerUserId();
+  const ownerPayload = cloudOwnerPayload();
   const payload = stripRemoteId(shift);
   try {
     if (shift.remoteId) {
       await cloudRequest("shifts", {
         method: "PATCH",
-        query: `?id=eq.${encodeURIComponent(shift.remoteId)}&user_id=eq.${encodeURIComponent(ownerUserId)}`,
-        body: { payload, user_id: ownerUserId },
+        query: `?id=eq.${encodeURIComponent(shift.remoteId)}`,
+        body: { payload, ...ownerPayload },
       });
       return shift;
     }
 
-    const [data] = await cloudRequest("shifts", { method: "POST", body: { user_id: ownerUserId, payload } });
+    const [data] = await cloudRequest("shifts", { method: "POST", body: { ...ownerPayload, payload } });
     return { ...shift, remoteId: data.id };
   } catch (error) {
     console.warn("Shift was saved locally but not synced to Supabase.", error);
@@ -1322,21 +1397,21 @@ async function saveShiftToCloud(shift) {
 }
 
 async function saveExpenseToCloud(expense) {
-  if (!hasCloudStorage() || !getCloudOwnerUserId()) return expense;
+  if (!hasCloudStorage() || !requireCloudUser()) return expense;
 
-  const ownerUserId = getCloudOwnerUserId();
+  const ownerPayload = cloudOwnerPayload();
   const payload = stripRemoteId(expense);
   try {
     if (expense.remoteId) {
       await cloudRequest("expenses", {
         method: "PATCH",
-        query: `?id=eq.${encodeURIComponent(expense.remoteId)}&user_id=eq.${encodeURIComponent(ownerUserId)}`,
-        body: { payload, user_id: ownerUserId },
+        query: `?id=eq.${encodeURIComponent(expense.remoteId)}`,
+        body: { payload, ...ownerPayload },
       });
       return expense;
     }
 
-    const [data] = await cloudRequest("expenses", { method: "POST", body: { user_id: ownerUserId, payload } });
+    const [data] = await cloudRequest("expenses", { method: "POST", body: { ...ownerPayload, payload } });
     return { ...expense, remoteId: data.id };
   } catch (error) {
     console.warn("Expense was saved locally but not synced to Supabase.", error);
@@ -1345,12 +1420,12 @@ async function saveExpenseToCloud(expense) {
 }
 
 async function deleteCloudRow(table, remoteId) {
-  if (!hasCloudStorage() || !remoteId || !getCloudOwnerUserId()) return;
+  if (!hasCloudStorage() || !remoteId || !requireCloudUser()) return;
 
   try {
     await cloudRequest(table, {
       method: "DELETE",
-      query: `?id=eq.${encodeURIComponent(remoteId)}&user_id=eq.${encodeURIComponent(getCloudOwnerUserId())}`,
+      query: `?id=eq.${encodeURIComponent(remoteId)}`,
       prefer: "return=minimal",
     });
   } catch (error) {
@@ -1359,13 +1434,14 @@ async function deleteCloudRow(table, remoteId) {
 }
 
 async function replaceCloudTable(table, items) {
-  if (!hasCloudStorage() || !getCloudOwnerUserId()) return;
+  if (!hasCloudStorage() || !requireCloudUser()) return;
 
   try {
-    const ownerUserId = getCloudOwnerUserId();
+    const ownerQuery = cloudOwnerQuery();
+    const ownerPayload = cloudOwnerPayload();
     await cloudRequest(table, {
       method: "DELETE",
-      query: `?user_id=eq.${encodeURIComponent(ownerUserId)}`,
+      query: `?${ownerQuery}`,
       prefer: "return=minimal",
     });
 
@@ -1373,7 +1449,7 @@ async function replaceCloudTable(table, items) {
 
     const data = await cloudRequest(table, {
       method: "POST",
-      body: items.map((item) => ({ user_id: ownerUserId, payload: stripRemoteId(item) })),
+      body: items.map((item) => ({ ...ownerPayload, payload: stripRemoteId(item) })),
     });
 
     data.forEach((row, index) => {
