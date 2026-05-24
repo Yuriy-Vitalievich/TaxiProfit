@@ -568,6 +568,14 @@ function getCurrentUserId() {
   return currentUser?.id || null;
 }
 
+function getTelegramId() {
+  return telegramProfilePayload().telegram_id || Number(userProfile.telegramId || 0) || null;
+}
+
+function getCloudOwnerUserId() {
+  return userProfile.userId || getCurrentUserId();
+}
+
 function setAuthGateOpen(isOpen) {
   if (!elements.authOverlay) return;
   elements.authOverlay.hidden = !isOpen;
@@ -575,8 +583,7 @@ function setAuthGateOpen(isOpen) {
 }
 
 function updateAccessFlow() {
-  const needsAuth = !authReady || !currentUser;
-  setAuthGateOpen(needsAuth);
+  setAuthGateOpen(false);
   renderOnboarding();
 }
 
@@ -626,9 +633,7 @@ async function initializeAuth() {
     currentUser = currentSession?.user || null;
 
     if (!currentUser) {
-      authReady = true;
-      renderProfile();
-      updateAccessFlow();
+      await signInAnonymously();
     } else {
       authReady = true;
       await ensureUserProfile();
@@ -741,8 +746,11 @@ async function ensureUserProfile() {
   if (!hasCloudStorage() || !getCurrentUserId()) return false;
 
   try {
+    const telegramId = getTelegramId();
+    const filters = [`user_id.eq.${encodeURIComponent(getCurrentUserId())}`];
+    if (telegramId) filters.push(`telegram_id.eq.${encodeURIComponent(telegramId)}`);
     const [row] = await cloudRequest("profiles", {
-      query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&select=*&limit=1`,
+      query: `?or=(${filters.join(",")})&select=*&order=onboarding_completed.desc&limit=1`,
     });
 
     if (row) {
@@ -791,16 +799,17 @@ async function saveUserProfile(profile) {
   }
 
   try {
+    const ownerUserId = getCloudOwnerUserId();
     const payload = profileToSupabasePayload(profile);
     const updated = await cloudRequest("profiles", {
       method: "PATCH",
-      query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}`,
-      body: payload,
+      query: `?user_id=eq.${encodeURIComponent(ownerUserId)}`,
+      body: { ...payload, user_id: ownerUserId },
     });
     if (Array.isArray(updated) && !updated.length) {
       await cloudRequest("profiles", {
         method: "POST",
-        body: payload,
+        body: { ...payload, user_id: ownerUserId },
       });
     }
     renderProfile("Профиль сохранен в Supabase.");
@@ -1108,8 +1117,8 @@ function normalizeCloudExpense(row) {
 }
 
 function requireCloudUser() {
-  if (!getCurrentUserId()) {
-    setSyncStatus("Войди в Supabase Auth, чтобы включить персональную синхронизацию.");
+  if (!getCloudOwnerUserId()) {
+    setSyncStatus("Подключаем Telegram ID для персональной синхронизации.");
     return false;
   }
   return true;
@@ -1120,7 +1129,7 @@ async function loadCloudSettings() {
 
   try {
     const [settings] = await cloudRequest("settings", {
-      query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&key=eq.dashboard&select=payload&limit=1`,
+      query: `?user_id=eq.${encodeURIComponent(getCloudOwnerUserId())}&key=eq.dashboard&select=payload&limit=1`,
     });
     const payload = settings?.payload || {};
     const legacyGoal = Number(payload.monthGoal);
@@ -1151,10 +1160,10 @@ async function loadCloudData({ applyEmpty = false, silent = false } = {}) {
   try {
     const [shiftResult, expenseResult] = await Promise.all([
       cloudRequest("shifts", {
-        query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&select=id,payload&order=created_at.asc`,
+        query: `?user_id=eq.${encodeURIComponent(getCloudOwnerUserId())}&select=id,payload&order=created_at.asc`,
       }),
       cloudRequest("expenses", {
-        query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&select=id,payload&order=created_at.asc`,
+        query: `?user_id=eq.${encodeURIComponent(getCloudOwnerUserId())}&select=id,payload&order=created_at.asc`,
       }),
     ]);
 
@@ -1205,7 +1214,8 @@ function scheduleSettingsReload() {
 }
 
 function setupRealtimeSync({ includeSettings = false } = {}) {
-  if (!hasRealtimeClient() || !getCurrentUserId()) {
+  const ownerUserId = getCloudOwnerUserId();
+  if (!hasRealtimeClient() || !ownerUserId) {
     setSyncStatus("Supabase работает через REST. Для realtime нужен supabase-js CDN.");
     return;
   }
@@ -1213,16 +1223,16 @@ function setupRealtimeSync({ includeSettings = false } = {}) {
   realtimeClient = createAuthClient();
 
   const channel = realtimeClient
-    .channel(`taxiprofit-live-${getCurrentUserId()}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "shifts", filter: `user_id=eq.${getCurrentUserId()}` }, () => {
+    .channel(`taxiprofit-live-${ownerUserId}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "shifts", filter: `user_id=eq.${ownerUserId}` }, () => {
       scheduleCloudReload("Смены обновлены в облаке.");
     })
-    .on("postgres_changes", { event: "*", schema: "public", table: "expenses", filter: `user_id=eq.${getCurrentUserId()}` }, () => {
+    .on("postgres_changes", { event: "*", schema: "public", table: "expenses", filter: `user_id=eq.${ownerUserId}` }, () => {
       scheduleCloudReload("Расходы обновлены в облаке.");
     });
 
   if (includeSettings) {
-    channel.on("postgres_changes", { event: "*", schema: "public", table: "settings", filter: `user_id=eq.${getCurrentUserId()}` }, () => {
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "settings", filter: `user_id=eq.${ownerUserId}` }, () => {
       scheduleSettingsReload();
     });
   }
@@ -1241,23 +1251,24 @@ function setupRealtimeSync({ includeSettings = false } = {}) {
 }
 
 async function saveSettingsToCloud() {
-  if (!hasCloudStorage() || !getCurrentUserId()) return;
+  if (!hasCloudStorage() || !getCloudOwnerUserId()) return;
 
   try {
+    const ownerUserId = getCloudOwnerUserId();
     const [existing] = await cloudRequest("settings", {
-      query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&key=eq.dashboard&select=id&limit=1`,
+      query: `?user_id=eq.${encodeURIComponent(ownerUserId)}&key=eq.dashboard&select=id&limit=1`,
     });
     if (existing?.id) {
       await cloudRequest("settings", {
         method: "PATCH",
         query: `?id=eq.${encodeURIComponent(existing.id)}`,
-        body: { payload: { weeklyGoal }, user_id: getCurrentUserId() },
+        body: { payload: { weeklyGoal }, user_id: ownerUserId },
       });
       return;
     }
     await cloudRequest("settings", {
       method: "POST",
-      body: { key: "dashboard", user_id: getCurrentUserId(), payload: { weeklyGoal } },
+      body: { key: "dashboard", user_id: ownerUserId, payload: { weeklyGoal } },
     });
   } catch (error) {
     console.warn("Settings were saved locally but not synced to Supabase.", error);
@@ -1272,20 +1283,21 @@ function scheduleSettingsSave() {
 }
 
 async function saveShiftToCloud(shift) {
-  if (!hasCloudStorage() || !getCurrentUserId()) return shift;
+  if (!hasCloudStorage() || !getCloudOwnerUserId()) return shift;
 
+  const ownerUserId = getCloudOwnerUserId();
   const payload = stripRemoteId(shift);
   try {
     if (shift.remoteId) {
       await cloudRequest("shifts", {
         method: "PATCH",
-        query: `?id=eq.${encodeURIComponent(shift.remoteId)}&user_id=eq.${encodeURIComponent(getCurrentUserId())}`,
-        body: { payload, user_id: getCurrentUserId() },
+        query: `?id=eq.${encodeURIComponent(shift.remoteId)}&user_id=eq.${encodeURIComponent(ownerUserId)}`,
+        body: { payload, user_id: ownerUserId },
       });
       return shift;
     }
 
-    const [data] = await cloudRequest("shifts", { method: "POST", body: { user_id: getCurrentUserId(), payload } });
+    const [data] = await cloudRequest("shifts", { method: "POST", body: { user_id: ownerUserId, payload } });
     return { ...shift, remoteId: data.id };
   } catch (error) {
     console.warn("Shift was saved locally but not synced to Supabase.", error);
@@ -1294,20 +1306,21 @@ async function saveShiftToCloud(shift) {
 }
 
 async function saveExpenseToCloud(expense) {
-  if (!hasCloudStorage() || !getCurrentUserId()) return expense;
+  if (!hasCloudStorage() || !getCloudOwnerUserId()) return expense;
 
+  const ownerUserId = getCloudOwnerUserId();
   const payload = stripRemoteId(expense);
   try {
     if (expense.remoteId) {
       await cloudRequest("expenses", {
         method: "PATCH",
-        query: `?id=eq.${encodeURIComponent(expense.remoteId)}&user_id=eq.${encodeURIComponent(getCurrentUserId())}`,
-        body: { payload, user_id: getCurrentUserId() },
+        query: `?id=eq.${encodeURIComponent(expense.remoteId)}&user_id=eq.${encodeURIComponent(ownerUserId)}`,
+        body: { payload, user_id: ownerUserId },
       });
       return expense;
     }
 
-    const [data] = await cloudRequest("expenses", { method: "POST", body: { user_id: getCurrentUserId(), payload } });
+    const [data] = await cloudRequest("expenses", { method: "POST", body: { user_id: ownerUserId, payload } });
     return { ...expense, remoteId: data.id };
   } catch (error) {
     console.warn("Expense was saved locally but not synced to Supabase.", error);
@@ -1316,12 +1329,12 @@ async function saveExpenseToCloud(expense) {
 }
 
 async function deleteCloudRow(table, remoteId) {
-  if (!hasCloudStorage() || !remoteId || !getCurrentUserId()) return;
+  if (!hasCloudStorage() || !remoteId || !getCloudOwnerUserId()) return;
 
   try {
     await cloudRequest(table, {
       method: "DELETE",
-      query: `?id=eq.${encodeURIComponent(remoteId)}&user_id=eq.${encodeURIComponent(getCurrentUserId())}`,
+      query: `?id=eq.${encodeURIComponent(remoteId)}&user_id=eq.${encodeURIComponent(getCloudOwnerUserId())}`,
       prefer: "return=minimal",
     });
   } catch (error) {
@@ -1330,12 +1343,13 @@ async function deleteCloudRow(table, remoteId) {
 }
 
 async function replaceCloudTable(table, items) {
-  if (!hasCloudStorage() || !getCurrentUserId()) return;
+  if (!hasCloudStorage() || !getCloudOwnerUserId()) return;
 
   try {
+    const ownerUserId = getCloudOwnerUserId();
     await cloudRequest(table, {
       method: "DELETE",
-      query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}`,
+      query: `?user_id=eq.${encodeURIComponent(ownerUserId)}`,
       prefer: "return=minimal",
     });
 
@@ -1343,7 +1357,7 @@ async function replaceCloudTable(table, items) {
 
     const data = await cloudRequest(table, {
       method: "POST",
-      body: items.map((item) => ({ user_id: getCurrentUserId(), payload: stripRemoteId(item) })),
+      body: items.map((item) => ({ user_id: ownerUserId, payload: stripRemoteId(item) })),
     });
 
     data.forEach((row, index) => {
