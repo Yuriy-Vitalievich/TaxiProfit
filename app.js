@@ -889,18 +889,21 @@ function renderProfile(message = "") {
   }
 
   if (elements.authStatusTitle) {
+    const hasDriverProfile = Boolean(profile.userId || profile.onboardingCompleted);
     elements.authStatusTitle.textContent = currentUser
       ? currentUser.is_anonymous
         ? "Профиль подключен"
         : "Аккаунт подключен"
+      : hasDriverProfile
+        ? "Профиль подключен"
       : authReady
         ? "Вход не выполнен"
         : "Проверяем вход...";
   }
   if (elements.authStatusText) {
-    elements.authStatusText.textContent = currentUser
+    elements.authStatusText.textContent = currentUser || profile.userId || profile.onboardingCompleted
       ? "Смены, расходы и настройки сохраняются в твоем аккаунте."
-      : "Войди, чтобы приложение могло вести персональную статистику.";
+      : "Профиль будет создан автоматически при первом запуске.";
   }
   if (elements.authMessage && message) elements.authMessage.textContent = message;
   if (elements.profileSaveStatus && message) elements.profileSaveStatus.textContent = message;
