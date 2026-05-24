@@ -2506,13 +2506,14 @@ function shiftFromForm(formData) {
 }
 
 function expenseFromForm(formData) {
+  const comment = String(formData.get("comment") || "").trim();
   return normalizeExpense({
     date: formData.get("date"),
     category: formData.get("category"),
-    description: formData.get("description"),
+    description: comment,
     amount: readNumber(formData, "amount"),
-    payment: formData.get("payment"),
-    comment: formData.get("comment"),
+    payment: "",
+    comment,
   });
 }
 
@@ -2713,10 +2714,8 @@ function editExpense(index) {
   setFormValues(elements.expenseForm, {
     date: expense.date,
     category: expense.category,
-    description: expense.description,
     amount: expense.amount || "",
-    payment: expense.payment,
-    comment: expense.comment,
+    comment: expense.comment || expense.description,
   });
   elements.expenseForm.scrollIntoView({ behavior: "smooth", block: "start" });
   renderShiftTables();

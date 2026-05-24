@@ -698,7 +698,7 @@
               <button class="ghost-button" type="button" id="cancelExpenseEdit" hidden>Отмена</button>
             </div>
 
-            <div class="form-grid">
+            <div class="form-grid expense-quick-grid">
               <label>
                 Дата
                 <input name="date" type="date" required />
@@ -715,20 +715,12 @@
                 </select>
               </label>
               <label>
-                Описание
-                <input name="description" type="text" placeholder="UKRNAFTA" />
-              </label>
-              <label>
                 Сумма, ₴
                 <input name="amount" type="number" min="0" step="0.01" placeholder="2700" required />
               </label>
-              <label>
-                Оплата
-                <input name="payment" type="text" placeholder="Карта" />
-              </label>
-              <label>
+              <label class="wide-field">
                 Комментарий
-                <input name="comment" type="text" placeholder="Полный бак" />
+                <input name="comment" type="text" placeholder="Например: полный бак, мойка, аренда" />
               </label>
             </div>
 

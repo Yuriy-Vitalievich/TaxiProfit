@@ -2188,6 +2188,10 @@ h2 {
   align-items: center;
 }
 
+.data-entry .panel {
+  min-width: 0;
+}
+
 .compact-info {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
@@ -2256,10 +2260,15 @@ h2 {
   gap: 14px;
 }
 
+.expense-quick-grid {
+  grid-template-columns: 1fr;
+  align-items: end;
+}
+
 .shift-time-row {
   display: grid;
-  grid-template-columns: minmax(112px, 1fr) minmax(88px, 0.8fr) minmax(88px, 0.8fr);
-  gap: 10px;
+  grid-template-columns: minmax(160px, 1.15fr) repeat(2, minmax(126px, 0.8fr));
+  gap: 12px;
 }
 
 .shift-time-row label {
@@ -2275,6 +2284,12 @@ h2 {
 
 .form-actions {
   justify-content: flex-end;
+}
+
+.shift-form .ghost-button {
+  min-height: 44px;
+  border-radius: 14px;
+  font-weight: 950;
 }
 
 .shift-form.editing {
@@ -2305,10 +2320,10 @@ h2 {
 .import-box input {
   width: 100%;
   min-width: 0;
-  min-height: 52px;
+  min-height: 56px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 0 13px;
+  padding: 0 14px;
   background: rgba(255, 255, 255, 0.065);
   color: var(--text);
   font: inherit;
@@ -2316,8 +2331,8 @@ h2 {
 }
 
 .shift-time-row input {
-  min-height: 58px;
-  padding: 0 10px;
+  min-height: 56px;
+  padding: 0 44px 0 13px;
   font-size: 16px;
   font-weight: 950;
 }
@@ -2385,7 +2400,7 @@ h2 {
 
 .platform-options span {
   display: grid;
-  min-height: 46px;
+  min-height: 56px;
   place-items: center;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -2415,7 +2430,7 @@ h2 {
 .shift-auto-summary div {
   display: grid;
   gap: 6px;
-  min-height: 78px;
+  min-height: 82px;
   align-content: center;
   padding: 12px;
   border: 1px solid rgba(40, 242, 156, 0.2);
@@ -2444,7 +2459,7 @@ h2 {
 
 .submit-button {
   width: 100%;
-  min-height: 50px;
+  min-height: 56px;
   margin-top: 14px;
   border: 0;
   border-radius: 16px;
@@ -2794,15 +2809,16 @@ h2 {
 
   .quick-shift-form {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .shift-time-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .shift-time-row label:first-child {
-    grid-column: 1 / -1;
+    grid-column: auto;
   }
 
   .runner-platforms {
@@ -2832,8 +2848,8 @@ h2 {
   }
 
   .shift-time-row input {
-    min-height: 56px;
-    padding-right: 42px;
+    min-height: 54px;
+    padding-right: 44px;
     background-position: right 14px center;
   }
 
@@ -2999,6 +3015,10 @@ h2 {
     gap: 10px;
   }
 
+  .expense-quick-grid {
+    grid-template-columns: 1fr;
+  }
+
   .profile-card,
   .profile-settings-form {
     border-radius: 18px;
@@ -3024,12 +3044,13 @@ h2 {
   .quick-shift-form input,
   .import-box input,
   .submit-button {
-    min-height: 48px;
+    min-height: 54px;
     font-size: 16px;
   }
 
+  .platform-options span,
   .shift-time-row input {
-    min-height: 56px;
+    min-height: 54px;
   }
 
   .raw-list {
