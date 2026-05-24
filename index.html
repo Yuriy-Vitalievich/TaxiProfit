@@ -10,11 +10,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="TaxiProfit - мобильный cockpit для учета смен, расходов и прибыли водителя такси." />
     <title>TaxiProfit</title>
-    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260525-1" />
+    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260525-2" />
     <link rel="icon" href="assets/icons/taxiprofit-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/icons/taxiprofit-icon.svg" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=telegram-20260525-1" />
+    <link rel="stylesheet" href="styles.css?v=telegram-20260525-2" />
   </head>
   <body>
     <section class="onboarding-overlay" id="onboardingOverlay" hidden aria-label="Регистрация водителя">
@@ -133,6 +133,11 @@
     </section>
 
     <div class="app-shell">
+      <div class="pull-refresh" id="pullRefresh" aria-hidden="true">
+        <span></span>
+        <strong>Обновить</strong>
+      </div>
+
       <header class="topbar">
         <button class="brand" type="button" id="menuToggle" aria-label="Открыть меню" aria-controls="sideMenu" aria-expanded="false">
           <span class="brand-mark" aria-hidden="true">🚖</span>
@@ -635,15 +640,27 @@
               <div class="shift-time-row wide-field">
                 <label>
                   Дата
-                  <input name="date" type="date" required />
+                  <input class="app-picker-native" name="date" type="date" required />
+                  <button class="app-picker-button" type="button" data-picker="date" data-picker-target="shiftForm.date" aria-label="Выбрать дату смены">
+                    <span data-picker-label>Дата</span>
+                    <i aria-hidden="true">▣</i>
+                  </button>
                 </label>
                 <label>
                   Старт
-                  <input name="start" type="time" value="17:30" aria-label="Вышел на линию" required />
+                  <input class="app-picker-native" name="start" type="time" value="17:30" aria-label="Вышел на линию" required />
+                  <button class="app-picker-button" type="button" data-picker="time" data-picker-target="shiftForm.start" aria-label="Выбрать время старта">
+                    <span data-picker-label>17:30</span>
+                    <i aria-hidden="true">◷</i>
+                  </button>
                 </label>
                 <label>
                   Финиш
-                  <input name="end" type="time" value="23:30" aria-label="Закончил работу" required />
+                  <input class="app-picker-native" name="end" type="time" value="23:30" aria-label="Выбрать время финиша" required />
+                  <button class="app-picker-button" type="button" data-picker="time" data-picker-target="shiftForm.end" aria-label="Выбрать время финиша">
+                    <span data-picker-label>23:30</span>
+                    <i aria-hidden="true">◷</i>
+                  </button>
                 </label>
               </div>
 
@@ -701,11 +718,15 @@
             <div class="form-grid expense-quick-grid">
               <label>
                 Дата
-                <input name="date" type="date" required />
+                <input class="app-picker-native" name="date" type="date" required />
+                <button class="app-picker-button" type="button" data-picker="date" data-picker-target="expenseForm.date" aria-label="Выбрать дату расхода">
+                  <span data-picker-label>Дата</span>
+                  <i aria-hidden="true">▣</i>
+                </button>
               </label>
               <label>
                 Категория
-                <select name="category">
+                <select class="app-picker-native" name="category">
                   <option>Аренда авто</option>
                   <option>Топливо</option>
                   <option>Мойка</option>
@@ -713,6 +734,10 @@
                   <option>Комиссии</option>
                   <option>Прочие</option>
                 </select>
+                <button class="app-picker-button" type="button" data-picker="select" data-picker-target="expenseForm.category" aria-label="Выбрать категорию расхода">
+                  <span data-picker-label>Аренда авто</span>
+                  <i aria-hidden="true">⌄</i>
+                </button>
               </label>
               <label>
                 Сумма, ₴
@@ -847,7 +872,19 @@
       </main>
     </div>
 
+    <div class="app-picker-sheet" id="appPickerSheet" hidden aria-modal="true" role="dialog" aria-label="Выбор значения">
+      <button class="app-picker-backdrop" type="button" data-picker-close aria-label="Закрыть выбор"></button>
+      <div class="app-picker-panel">
+        <div class="app-picker-handle" aria-hidden="true"></div>
+        <div class="app-picker-head">
+          <strong id="appPickerTitle">Выбор</strong>
+          <button type="button" data-picker-close aria-label="Закрыть">×</button>
+        </div>
+        <div class="app-picker-body" id="appPickerBody"></div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=telegram-20260525-1"></script>
+    <script src="app.js?v=telegram-20260525-2"></script>
   </body>
 </html>

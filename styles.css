@@ -87,6 +87,48 @@ body.telegram-mini-app .app-shell {
   padding-top: calc(env(safe-area-inset-top, 0px) + 58px);
 }
 
+.pull-refresh {
+  position: fixed;
+  z-index: 65;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 40px;
+  padding: 0 15px;
+  border: 1px solid rgba(40, 242, 156, 0.24);
+  border-radius: 999px;
+  background: rgba(18, 22, 34, 0.9);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 950;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -62px) scale(0.96);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+  box-shadow: 0 16px 46px rgba(0, 0, 0, 0.32);
+}
+
+.pull-refresh span {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(40, 242, 156, 0.26);
+  border-top-color: var(--profit);
+  border-radius: 999px;
+}
+
+.pull-refresh.visible {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.pull-refresh.loading span {
+  animation: picker-spin 0.72s linear infinite;
+}
+
 body.telegram-mini-app .topbar {
   position: relative;
   top: auto;
@@ -2330,6 +2372,62 @@ h2 {
   outline: none;
 }
 
+.app-picker-native {
+  position: absolute;
+  width: 1px !important;
+  height: 1px !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none;
+  clip-path: inset(50%);
+}
+
+.app-picker-button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 56px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0 13px 0 16px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.065);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-align: left;
+  outline: none;
+}
+
+.app-picker-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-picker-button i {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: #cfe0f3;
+  font-style: normal;
+  font-size: 1.18rem;
+  line-height: 1;
+}
+
+.app-picker-button:focus-visible {
+  border-color: rgba(40, 242, 156, 0.5);
+  box-shadow: 0 0 0 4px rgba(40, 242, 156, 0.1);
+}
+
 .shift-time-row input {
   min-height: 56px;
   padding: 0 44px 0 13px;
@@ -2371,6 +2469,156 @@ h2 {
   padding: 0;
   opacity: 0;
   cursor: pointer;
+}
+
+.app-picker-sheet[hidden] {
+  display: none;
+}
+
+.app-picker-sheet {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: grid;
+  align-items: end;
+}
+
+.app-picker-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.54);
+}
+
+.app-picker-panel {
+  position: relative;
+  width: min(100%, 560px);
+  max-height: min(76vh, 620px);
+  margin: 0 auto;
+  padding: 10px 18px calc(env(safe-area-inset-bottom, 0px) + 18px);
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 28px 28px 0 0;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(40, 242, 156, 0.12), transparent 18rem),
+    linear-gradient(145deg, rgba(31, 37, 55, 0.98), rgba(17, 21, 33, 0.98));
+  box-shadow: 0 -24px 80px rgba(0, 0, 0, 0.46);
+}
+
+.app-picker-handle {
+  width: 56px;
+  height: 5px;
+  margin: 0 auto 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.app-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.app-picker-head strong {
+  font-size: 1.25rem;
+  font-weight: 950;
+}
+
+.app-picker-head button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.picker-calendar-head {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.picker-calendar-head button,
+.picker-option {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.picker-calendar-head button {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  border-radius: 14px;
+  font-size: 1.5rem;
+  font-weight: 950;
+}
+
+.picker-calendar-head strong {
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.picker-weekdays,
+.picker-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.picker-weekdays {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-align: center;
+}
+
+.picker-day,
+.picker-empty {
+  min-height: 44px;
+}
+
+.picker-day {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text);
+  font-weight: 950;
+}
+
+.picker-day.active,
+.picker-option.active {
+  border-color: rgba(40, 242, 156, 0.58);
+  background: rgba(40, 242, 156, 0.16);
+  color: var(--profit);
+}
+
+.picker-options-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.picker-option {
+  min-height: 48px;
+  border-radius: 14px;
+  font-weight: 950;
+}
+
+@keyframes picker-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .form-grid input:focus,
@@ -3042,6 +3290,7 @@ h2 {
   .profile-form-grid input,
   .profile-form-grid select,
   .quick-shift-form input,
+  .app-picker-button,
   .import-box input,
   .submit-button {
     min-height: 54px;

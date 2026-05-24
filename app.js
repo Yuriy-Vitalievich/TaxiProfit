@@ -205,6 +205,12 @@ const elements = {
   expenseSubmit: document.querySelector("#expenseSubmit"),
   cancelExpenseEdit: document.querySelector("#cancelExpenseEdit"),
   clearData: document.querySelector("#clearData"),
+  appShell: document.querySelector(".app-shell"),
+  pullRefresh: document.querySelector("#pullRefresh"),
+  appPickerSheet: document.querySelector("#appPickerSheet"),
+  appPickerTitle: document.querySelector("#appPickerTitle"),
+  appPickerBody: document.querySelector("#appPickerBody"),
+  appPickerButtons: document.querySelectorAll("[data-picker-target]"),
   profileButton: document.querySelector("#profileButton"),
   authForm: document.querySelector("#authForm"),
   authOverlay: document.querySelector("#authOverlay"),
@@ -249,6 +255,8 @@ let realtimeClient = null;
 let realtimeReloadTimer = null;
 let cloudLoadedOnce = false;
 let menuTouchStart = null;
+let pickerState = { target: null, type: null, month: null };
+let pullRefreshState = { startY: 0, pulling: false, ready: false, loading: false };
 let settingsSaveTimer = null;
 let authClient = null;
 let currentSession = null;
@@ -569,6 +577,213 @@ function registerServiceWorker() {
       console.warn("Service worker registration failed.", error);
     });
   });
+}
+
+function pickerFieldFromPath(path) {
+  const [formName, fieldName] = String(path || "").split(".");
+  const form = elements[formName];
+  return form?.elements?.[fieldName] || null;
+}
+
+function formatPickerDate(value) {
+  if (!value) return "Дата";
+  return new Date(`${value}T12:00`)
+    .toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })
+    .replace(/\s?г\.$/, "");
+}
+
+function pickerLabel(field, type) {
+  if (!field) return "";
+  if (type === "date") return formatPickerDate(field.value);
+  if (type === "select") return field.selectedOptions?.[0]?.textContent || field.value || "Выбрать";
+  return field.value || "Время";
+}
+
+function syncAppPickers() {
+  elements.appPickerButtons.forEach((button) => {
+    const field = pickerFieldFromPath(button.dataset.pickerTarget);
+    const label = button.querySelector("[data-picker-label]");
+    if (label) label.textContent = pickerLabel(field, button.dataset.picker);
+  });
+}
+
+function closeAppPicker() {
+  pickerState = { target: null, type: null, month: null };
+  if (elements.appPickerSheet) elements.appPickerSheet.hidden = true;
+  if (elements.appPickerBody) elements.appPickerBody.innerHTML = "";
+}
+
+function setPickerValue(value) {
+  const field = pickerState.target;
+  if (!field) return;
+  field.value = value;
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+  syncAppPickers();
+  closeAppPicker();
+}
+
+function renderDatePicker() {
+  const field = pickerState.target;
+  const selected = field?.value || dateKey(new Date());
+  if (!pickerState.month) pickerState.month = new Date(`${selected}T12:00`);
+  const month = new Date(pickerState.month.getFullYear(), pickerState.month.getMonth(), 1, 12);
+  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const offset = (month.getDay() + 6) % 7;
+  const monthLabel = month.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  const blanks = Array.from({ length: offset }, () => `<span class="picker-empty"></span>`).join("");
+  const days = Array.from({ length: daysInMonth }, (_, index) => {
+    const day = index + 1;
+    const value = dateKey(new Date(month.getFullYear(), month.getMonth(), day, 12));
+    return `<button class="picker-day ${value === selected ? "active" : ""}" type="button" data-picker-value="${value}">${day}</button>`;
+  }).join("");
+
+  elements.appPickerBody.innerHTML = `
+    <div class="picker-calendar-head">
+      <button type="button" data-picker-month="-1" aria-label="Предыдущий месяц">‹</button>
+      <strong>${monthLabel}</strong>
+      <button type="button" data-picker-month="1" aria-label="Следующий месяц">›</button>
+    </div>
+    <div class="picker-weekdays" aria-hidden="true">
+      <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+    </div>
+    <div class="picker-days">${blanks}${days}</div>
+  `;
+}
+
+function renderTimePicker() {
+  const selected = pickerState.target?.value || "17:30";
+  const options = [];
+  for (let hour = 0; hour < 24; hour += 1) {
+    for (let minute = 0; minute < 60; minute += 15) {
+      const value = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+      options.push(`<button class="picker-option ${value === selected ? "active" : ""}" type="button" data-picker-value="${value}">${value}</button>`);
+    }
+  }
+  elements.appPickerBody.innerHTML = `<div class="picker-options-grid time-grid">${options.join("")}</div>`;
+}
+
+function renderSelectPicker() {
+  const field = pickerState.target;
+  const options = [...(field?.options || [])].map((option) => {
+    const selected = option.value === field.value;
+    return `<button class="picker-option ${selected ? "active" : ""}" type="button" data-picker-value="${option.value}">${option.textContent}</button>`;
+  });
+  elements.appPickerBody.innerHTML = `<div class="picker-options-grid select-grid">${options.join("")}</div>`;
+}
+
+function openAppPicker(button) {
+  const field = pickerFieldFromPath(button.dataset.pickerTarget);
+  if (!field || !elements.appPickerSheet) return;
+  pickerState = {
+    target: field,
+    type: button.dataset.picker,
+    month: field.value ? new Date(`${field.value}T12:00`) : new Date(),
+  };
+  elements.appPickerTitle.textContent = button.closest("label")?.childNodes?.[0]?.textContent?.trim() || "Выбор";
+  elements.appPickerSheet.hidden = false;
+  if (pickerState.type === "date") renderDatePicker();
+  if (pickerState.type === "time") renderTimePicker();
+  if (pickerState.type === "select") renderSelectPicker();
+}
+
+function setupAppPickers() {
+  elements.appPickerButtons.forEach((button) => {
+    button.addEventListener("click", () => openAppPicker(button));
+  });
+
+  elements.appPickerSheet?.addEventListener("click", (event) => {
+    const close = event.target.closest("[data-picker-close]");
+    if (close) {
+      closeAppPicker();
+      return;
+    }
+
+    const monthButton = event.target.closest("[data-picker-month]");
+    if (monthButton) {
+      pickerState.month = new Date(
+        pickerState.month.getFullYear(),
+        pickerState.month.getMonth() + Number(monthButton.dataset.pickerMonth),
+        1,
+        12,
+      );
+      renderDatePicker();
+      return;
+    }
+
+    const valueButton = event.target.closest("[data-picker-value]");
+    if (valueButton) setPickerValue(valueButton.dataset.pickerValue);
+  });
+
+  syncAppPickers();
+}
+
+async function refreshAppData() {
+  if (pullRefreshState.loading) return;
+  pullRefreshState.loading = true;
+  elements.pullRefresh?.classList.add("visible", "loading");
+  const label = elements.pullRefresh?.querySelector("strong");
+  if (label) label.textContent = "Обновляем";
+
+  try {
+    const cloudReady = await loadCloudData({ applyEmpty: true, silent: true });
+    if (cloudReady) await loadCloudSettings();
+    renderProfile();
+    renderCsvSyncStatus();
+    renderAll();
+  } finally {
+    window.setTimeout(() => {
+      pullRefreshState = { startY: 0, pulling: false, ready: false, loading: false };
+      if (label) label.textContent = "Обновить";
+      elements.pullRefresh?.classList.remove("visible", "loading", "ready");
+    }, 420);
+  }
+}
+
+function setupPullToRefresh() {
+  if (!elements.appShell || !elements.pullRefresh) return;
+
+  elements.appShell.addEventListener(
+    "touchstart",
+    (event) => {
+      if (pullRefreshState.loading || elements.appShell.scrollTop > 2 || !event.touches?.[0]) return;
+      pullRefreshState.startY = event.touches[0].clientY;
+      pullRefreshState.pulling = true;
+      pullRefreshState.ready = false;
+    },
+    { passive: true },
+  );
+
+  elements.appShell.addEventListener(
+    "touchmove",
+    (event) => {
+      if (!pullRefreshState.pulling || !event.touches?.[0]) return;
+      const distance = event.touches[0].clientY - pullRefreshState.startY;
+      if (distance <= 18) return;
+      event.preventDefault();
+      pullRefreshState.ready = distance > 86;
+      elements.pullRefresh.classList.add("visible");
+      elements.pullRefresh.style.transform = `translate(-50%, ${Math.min(distance - 68, 18)}px) scale(1)`;
+      const label = elements.pullRefresh.querySelector("strong");
+      if (label) label.textContent = pullRefreshState.ready ? "Отпустите" : "Потяните";
+    },
+    { passive: false },
+  );
+
+  elements.appShell.addEventListener(
+    "touchend",
+    () => {
+      if (!pullRefreshState.pulling) return;
+      elements.pullRefresh.style.transform = "";
+      if (pullRefreshState.ready) {
+        refreshAppData();
+        return;
+      }
+      pullRefreshState = { startY: 0, pulling: false, ready: false, loading: false };
+      elements.pullRefresh.classList.remove("visible", "loading");
+    },
+    { passive: true },
+  );
 }
 
 function getAuthToken() {
@@ -2665,6 +2880,7 @@ function resetShiftForm() {
   elements.shiftSubmit.textContent = "Добавить смену";
   elements.cancelShiftEdit.hidden = true;
   updateShiftAutoSummary();
+  syncAppPickers();
 }
 
 function resetExpenseForm() {
@@ -2676,6 +2892,7 @@ function resetExpenseForm() {
   elements.expenseFormTitle.textContent = "Добавить расход";
   elements.expenseSubmit.textContent = "Добавить расход";
   elements.cancelExpenseEdit.hidden = true;
+  syncAppPickers();
 }
 
 function editShift(index) {
@@ -2697,6 +2914,7 @@ function editShift(index) {
     km: shift.km || "",
   });
   updateShiftAutoSummary();
+  syncAppPickers();
   elements.shiftForm.scrollIntoView({ behavior: "smooth", block: "start" });
   renderShiftTables();
 }
@@ -2717,6 +2935,7 @@ function editExpense(index) {
     amount: expense.amount || "",
     comment: expense.comment || expense.description,
   });
+  syncAppPickers();
   elements.expenseForm.scrollIntoView({ behavior: "smooth", block: "start" });
   renderShiftTables();
 }
@@ -3512,6 +3731,8 @@ if (elements.dayPicker) elements.dayPicker.value = selectedDay;
 setupTelegramMiniApp();
 registerServiceWorker();
 preventAccidentalZoom();
+setupAppPickers();
+setupPullToRefresh();
 updateDayPickerVisibility();
 setView(location.hash.replace("#", ""));
 renderCsvSyncStatus();
