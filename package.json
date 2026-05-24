@@ -1,0 +1,21 @@
+{
+  "name": "taxiprofit",
+  "version": "0.6.0",
+  "private": true,
+  "description": "TaxiProfit mobile app shell",
+  "scripts": {
+    "serve": "python3 -m http.server 4186",
+    "cap:init": "npx cap init TaxiProfit app.taxiprofit.driver --web-dir .",
+    "cap:add:android": "npx cap add android",
+    "cap:add:ios": "npx cap add ios",
+    "cap:sync": "npx cap sync",
+    "cap:open:android": "npx cap open android",
+    "cap:open:ios": "npx cap open ios"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/ios": "^7.0.0"
+  }
+}

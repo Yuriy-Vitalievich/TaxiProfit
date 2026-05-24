@@ -3,9 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#07100f" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="TaxiProfit" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="TaxiProfit - мобильный cockpit для учета смен, расходов и прибыли водителя такси." />
     <title>TaxiProfit</title>
+    <link rel="manifest" href="manifest.webmanifest?v=pwa-1" />
+    <link rel="icon" href="assets/icons/taxiprofit-icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="assets/icons/taxiprofit-icon.svg" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=telegram-id-1" />
+    <link rel="stylesheet" href="styles.css?v=pwa-1" />
   </head>
   <body>
     <section class="onboarding-overlay" id="onboardingOverlay" hidden aria-label="Регистрация водителя">
@@ -847,6 +856,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=telegram-id-1"></script>
+    <script src="app.js?v=pwa-1"></script>
   </body>
 </html>
