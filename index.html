@@ -5,24 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TaxiProfit</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=auth-flow-1" />
+    <link rel="stylesheet" href="styles.css?v=telegram-id-1" />
   </head>
   <body>
-    <section class="auth-overlay" id="authOverlay" hidden aria-label="Авторизация">
-      <div class="auth-gate-card">
-        <div class="onboarding-logo" aria-hidden="true">🚖</div>
-        <span class="section-kicker">TaxiProfit</span>
-        <h1>Вход для водителя</h1>
-        <p>Сначала подключим аккаунт, потом настроим профиль авто и начнем считать твою статистику.</p>
-        <button class="submit-button" type="button" id="authStartButton">Продолжить</button>
-        <form class="auth-email-line" id="authForm">
-          <input name="email" type="email" autocomplete="email" placeholder="или email для ссылки входа" />
-          <button class="ghost-button" type="submit">Отправить</button>
-        </form>
-        <p class="profile-hint" id="authMessage">В Telegram приложение привяжет профиль к твоему Telegram ID.</p>
-      </div>
-    </section>
-
     <section class="onboarding-overlay" id="onboardingOverlay" hidden aria-label="Регистрация водителя">
       <div class="onboarding-card">
         <div class="onboarding-progress" aria-hidden="true">
@@ -862,6 +847,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=auth-flow-1"></script>
+    <script src="app.js?v=telegram-id-1"></script>
   </body>
 </html>

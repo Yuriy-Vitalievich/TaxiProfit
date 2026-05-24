@@ -102,6 +102,34 @@ create index if not exists profiles_telegram_id_idx
 on public.profiles(telegram_id)
 where telegram_id is not null;
 
+create or replace function public.current_telegram_id()
+returns bigint
+language sql
+stable
+as $$
+  select case
+    when (auth.jwt() -> 'user_metadata' ->> 'telegram_id') ~ '^[0-9]+$'
+    then (auth.jwt() -> 'user_metadata' ->> 'telegram_id')::bigint
+    else null
+  end
+$$;
+
+create or replace function public.user_matches_current_telegram(target_user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles p
+    where p.user_id = target_user_id
+      and p.telegram_id is not null
+      and p.telegram_id = public.current_telegram_id()
+  )
+$$;
+
 alter table public.shifts replica identity full;
 alter table public.expenses replica identity full;
 alter table public.settings replica identity full;
@@ -184,100 +212,100 @@ drop policy if exists "Users read own profile" on public.profiles;
 create policy "Users read own profile"
 on public.profiles for select
 to authenticated
-using (user_id = auth.uid());
+using (user_id = auth.uid() or telegram_id = public.current_telegram_id());
 
 drop policy if exists "Users insert own profile" on public.profiles;
 create policy "Users insert own profile"
 on public.profiles for insert
 to authenticated
-with check (user_id = auth.uid());
+with check (user_id = auth.uid() or telegram_id = public.current_telegram_id());
 
 drop policy if exists "Users update own profile" on public.profiles;
 create policy "Users update own profile"
 on public.profiles for update
 to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
+using (user_id = auth.uid() or telegram_id = public.current_telegram_id())
+with check (user_id = auth.uid() or telegram_id = public.current_telegram_id());
 
 drop policy if exists "Public read shifts" on public.shifts;
 drop policy if exists "Users read own shifts" on public.shifts;
 create policy "Users read own shifts"
 on public.shifts for select
 to authenticated
-using (user_id = auth.uid());
+using (user_id = auth.uid() or public.user_matches_current_telegram(user_id));
 
 drop policy if exists "Public insert shifts" on public.shifts;
 drop policy if exists "Users insert own shifts" on public.shifts;
 create policy "Users insert own shifts"
 on public.shifts for insert
 to authenticated
-with check (user_id = auth.uid());
+with check (user_id = auth.uid() or public.user_matches_current_telegram(user_id));
 
 drop policy if exists "Public update shifts" on public.shifts;
 drop policy if exists "Users update own shifts" on public.shifts;
 create policy "Users update own shifts"
 on public.shifts for update
 to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
+using (user_id = auth.uid() or public.user_matches_current_telegram(user_id))
+with check (user_id = auth.uid() or public.user_matches_current_telegram(user_id));
 
 drop policy if exists "Public delete shifts" on public.shifts;
 drop policy if exists "Users delete own shifts" on public.shifts;
 create policy "Users delete own shifts"
 on public.shifts for delete
 to authenticated
-using (user_id = auth.uid());
+using (user_id = auth.uid() or public.user_matches_current_telegram(user_id));
 
 drop policy if exists "Public read expenses" on public.expenses;
 drop policy if exists "Users read own expenses" on public.expenses;
 create policy "Users read own expenses"
 on public.expenses for select
 to authenticated
-using (user_id = auth.uid());
+using (user_id = auth.uid() or public.user_matches_current_telegram(user_id));
 
 drop policy if exists "Public insert expenses" on public.expenses;
 drop policy if exists "Users insert own expenses" on public.expenses;
 create policy "Users insert own expenses"
 on public.expenses for insert
 to authenticated
-with check (user_id = auth.uid());
+with check (user_id = auth.uid() or public.user_matches_current_telegram(user_id));
 
 drop policy if exists "Public update expenses" on public.expenses;
 drop policy if exists "Users update own expenses" on public.expenses;
 create policy "Users update own expenses"
 on public.expenses for update
 to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
+using (user_id = auth.uid() or public.user_matches_current_telegram(user_id))
+with check (user_id = auth.uid() or public.user_matches_current_telegram(user_id));
 
 drop policy if exists "Public delete expenses" on public.expenses;
 drop policy if exists "Users delete own expenses" on public.expenses;
 create policy "Users delete own expenses"
 on public.expenses for delete
 to authenticated
-using (user_id = auth.uid());
+using (user_id = auth.uid() or public.user_matches_current_telegram(user_id));
 
 drop policy if exists "Public read settings" on public.settings;
 drop policy if exists "Users read own settings" on public.settings;
 create policy "Users read own settings"
 on public.settings for select
 to authenticated
-using (user_id = auth.uid());
+using (user_id = auth.uid() or public.user_matches_current_telegram(user_id));
 
 drop policy if exists "Public insert settings" on public.settings;
 drop policy if exists "Users insert own settings" on public.settings;
 create policy "Users insert own settings"
 on public.settings for insert
 to authenticated
-with check (user_id = auth.uid());
+with check (user_id = auth.uid() or public.user_matches_current_telegram(user_id));
 
 drop policy if exists "Public update settings" on public.settings;
 drop policy if exists "Users update own settings" on public.settings;
 create policy "Users update own settings"
 on public.settings for update
 to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
+using (user_id = auth.uid() or public.user_matches_current_telegram(user_id))
+with check (user_id = auth.uid() or public.user_matches_current_telegram(user_id));
 
 do $$
 begin
