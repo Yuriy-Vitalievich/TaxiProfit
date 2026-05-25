@@ -219,6 +219,15 @@ const elements = {
   authStatusTitle: document.querySelector("#authStatusTitle"),
   authStatusText: document.querySelector("#authStatusText"),
   signOutButton: document.querySelector("#signOutButton"),
+  editProfileButton: document.querySelector("#editProfileButton"),
+  cancelProfileEdit: document.querySelector("#cancelProfileEdit"),
+  deleteProfileButton: document.querySelector("#deleteProfileButton"),
+  profileSummaryCard: document.querySelector("#profileSummaryCard"),
+  profileRegisteredStatus: document.querySelector("#profileRegisteredStatus"),
+  profileOdometerLabel: document.querySelector("#profileOdometerLabel"),
+  profileFuelLabel: document.querySelector("#profileFuelLabel"),
+  profileSessionLabel: document.querySelector("#profileSessionLabel"),
+  profileSessionText: document.querySelector("#profileSessionText"),
   profileForm: document.querySelector("#profileForm"),
   profileTelegramId: document.querySelector("#profileTelegramId"),
   profileSupabaseId: document.querySelector("#profileSupabaseId"),
@@ -262,6 +271,7 @@ let authClient = null;
 let currentSession = null;
 let currentUser = null;
 let userProfile = loadLocalProfile();
+let isProfileEditing = false;
 let authReady = false;
 let onboardingStepIndex = 0;
 let onboardingDraft = loadOnboardingDraft();
@@ -1192,17 +1202,34 @@ async function saveUserProfile(profile) {
   }
 }
 
+async function deleteCloudProfile() {
+  if (!hasCloudStorage() || !requireCloudUser()) return false;
+
+  try {
+    const ownerQuery = cloudOwnerQuery();
+    await cloudRequest("profiles", {
+      method: "DELETE",
+      query: ownerQuery ? `?${ownerQuery}` : "",
+      prefer: "return=minimal",
+    });
+    return true;
+  } catch (error) {
+    console.warn("Profile delete failed.", error);
+    renderProfile("Не удалось удалить профиль в Supabase. Попробуй еще раз.");
+    return false;
+  }
+}
+
 function readProfileForm() {
   if (!elements.profileForm) return {};
   const data = new FormData(elements.profileForm);
   return {
+    ...userProfile,
     driverName: String(data.get("driverName") || "").trim(),
-    city: String(data.get("city") || "").trim(),
     carBrand: String(data.get("carBrand") || "").trim(),
     carModel: String(data.get("carModel") || "").trim(),
-    carNumber: String(data.get("carNumber") || "").trim(),
-    defaultPlatform: String(data.get("defaultPlatform") || "Bolt"),
-    phone: String(data.get("phone") || "").trim(),
+    odometer: Number(data.get("odometer") || 0) || "",
+    fuelConsumption: Number(data.get("fuelConsumption") || 0) || "",
     weeklyGoal: Number(data.get("weeklyGoal") || weeklyGoal || DEFAULT_WEEKLY_GOAL),
   };
 }
@@ -1211,12 +1238,10 @@ function fillProfileForm() {
   if (!elements.profileForm) return;
   const profile = { ...userProfile };
   elements.profileForm.elements.driverName.value = profile.driverName || profile.displayName || telegramDisplayName() || "";
-  elements.profileForm.elements.city.value = profile.city || "";
   elements.profileForm.elements.carBrand.value = profile.carBrand || "";
   elements.profileForm.elements.carModel.value = profile.carModel || "";
-  elements.profileForm.elements.carNumber.value = profile.carNumber || "";
-  elements.profileForm.elements.defaultPlatform.value = profile.defaultPlatform || selectedRunnerPlatform || "Bolt";
-  elements.profileForm.elements.phone.value = profile.phone || "";
+  elements.profileForm.elements.odometer.value = profile.odometer || "";
+  elements.profileForm.elements.fuelConsumption.value = profile.fuelConsumption || "";
   elements.profileForm.elements.weeklyGoal.value = Number(profile.weeklyGoal || weeklyGoal || DEFAULT_WEEKLY_GOAL);
 }
 
@@ -1245,6 +1270,29 @@ function renderProfile(message = "") {
     const carTitle = [profile.carBrand, profile.carModel, profile.carYear].filter(Boolean).join(" ");
     elements.profileCarLabel.textContent = carTitle || "Авто не указано";
   }
+  const latestOdometer = latestKnownOdometer();
+  const registered = Boolean(profile.userId || profile.onboardingCompleted || profile.driverName || profile.carBrand);
+  if (elements.profileRegisteredStatus) {
+    elements.profileRegisteredStatus.textContent = registered ? "Профиль зарегистрирован" : "Профиль не заполнен";
+    elements.profileRegisteredStatus.classList.toggle("muted", !registered);
+  }
+  if (elements.profileOdometerLabel) {
+    elements.profileOdometerLabel.textContent = latestOdometer ? `${formatNumber(Number(latestOdometer.toFixed(1)))} км` : "— км";
+  }
+  if (elements.profileFuelLabel) {
+    elements.profileFuelLabel.textContent = profile.fuelConsumption ? `${formatNumber(profile.fuelConsumption)} л/100 км` : "— л/100 км";
+  }
+  if (elements.profileSessionLabel) {
+    const telegramId = telegram.telegram_id || profile.telegramId || "";
+    elements.profileSessionLabel.textContent = telegramId ? `Telegram ${telegramId}` : "Локальная сессия";
+  }
+  if (elements.profileSessionText) {
+    elements.profileSessionText.textContent = telegram.telegram_username
+      ? `@${telegram.telegram_username}`
+      : currentUser?.id
+        ? `Supabase ${currentUser.id.slice(0, 8)}...`
+        : "Кабинет водителя";
+  }
 
   if (elements.authStatusTitle) {
     const hasDriverProfile = Boolean(profile.userId || profile.onboardingCompleted);
@@ -1263,6 +1311,9 @@ function renderProfile(message = "") {
       ? "Смены, расходы и настройки сохраняются в твоем аккаунте."
       : "Профиль будет создан автоматически при первом запуске.";
   }
+  if (elements.profileForm) elements.profileForm.hidden = !isProfileEditing;
+  if (elements.profileSummaryCard) elements.profileSummaryCard.hidden = isProfileEditing;
+  if (elements.editProfileButton) elements.editProfileButton.textContent = isProfileEditing ? "Закрыть" : "Редактировать";
   if (elements.authMessage && message) elements.authMessage.textContent = message;
   if (elements.profileSaveStatus && message) elements.profileSaveStatus.textContent = message;
   fillProfileForm();
@@ -1367,6 +1418,7 @@ function readOnboardingInputs() {
 
   onboardingDraft = {
     ...onboardingDraft,
+    driverName: textValue("driverName"),
     carBrand: textValue("carBrand"),
     carModel: textValue("carModel"),
     carYear: numberValue("carYear"),
@@ -1384,7 +1436,7 @@ function fillOnboardingInputs() {
   const root = elements.onboardingOverlay;
   if (!root) return;
   const source = { ...userProfile, ...onboardingDraft };
-  ["carBrand", "carModel", "carYear", "fuelType", "fuelConsumption", "odometer", "rentAmount", "rentFrequency", "rentPaymentDay"].forEach((name) => {
+  ["driverName", "carBrand", "carModel", "carYear", "fuelType", "fuelConsumption", "odometer", "rentAmount", "rentFrequency", "rentPaymentDay"].forEach((name) => {
     const input = root.querySelector(`[name="${name}"]`);
     if (input && source[name] !== undefined && source[name] !== null) input.value = source[name];
   });
@@ -1393,6 +1445,7 @@ function fillOnboardingInputs() {
 function validateOnboardingStep() {
   const step = currentOnboardingStep();
   if (step === "carType" && !onboardingDraft.carOwnership) return "Выбери тип авто.";
+  if (step === "vehicle" && !String(onboardingDraft.driverName || "").trim()) return "Укажи имя водителя.";
   if (step === "platforms" && !(onboardingDraft.platforms || []).length) return "Выбери хотя бы один агрегатор.";
   return "";
 }
@@ -3559,8 +3612,35 @@ elements.signOutButton?.addEventListener("click", async () => {
 
 elements.profileForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
+  isProfileEditing = false;
   await saveUserProfile(readProfileForm());
   renderAll();
+});
+
+elements.editProfileButton?.addEventListener("click", () => {
+  isProfileEditing = !isProfileEditing;
+  fillProfileForm();
+  renderProfile();
+});
+
+elements.cancelProfileEdit?.addEventListener("click", () => {
+  isProfileEditing = false;
+  fillProfileForm();
+  renderProfile();
+});
+
+elements.deleteProfileButton?.addEventListener("click", async () => {
+  const confirmed = window.confirm("Удалить профиль водителя? Смены и расходы останутся, но регистрация и настройки кабинета будут очищены.");
+  if (!confirmed) return;
+  const cloudDeleted = await deleteCloudProfile();
+  if (hasCloudStorage() && requireCloudUser() && !cloudDeleted) return;
+  userProfile = {};
+  isProfileEditing = false;
+  clearOnboardingDraft();
+  writeStorage(JSON.stringify(userProfile), PROFILE_STORAGE_KEY);
+  renderProfile("Профиль удален. При следующем входе регистрация откроется снова.");
+  renderOnboarding();
+  updateAccessFlow();
 });
 
 elements.onboardingStart?.addEventListener("click", () => {
