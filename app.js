@@ -255,7 +255,7 @@ let realtimeClient = null;
 let realtimeReloadTimer = null;
 let cloudLoadedOnce = false;
 let menuTouchStart = null;
-let pickerState = { target: null, type: null, month: null };
+let pickerState = { target: null, type: null, month: null, hour: "00", minute: "00", wheelTimer: null };
 let pullRefreshState = { startY: 0, pulling: false, ready: false, loading: false };
 let settingsSaveTimer = null;
 let authClient = null;
@@ -608,7 +608,8 @@ function syncAppPickers() {
 }
 
 function closeAppPicker() {
-  pickerState = { target: null, type: null, month: null };
+  if (pickerState.wheelTimer) window.clearTimeout(pickerState.wheelTimer);
+  pickerState = { target: null, type: null, month: null, hour: "00", minute: "00", wheelTimer: null };
   if (elements.appPickerSheet) elements.appPickerSheet.hidden = true;
   if (elements.appPickerBody) elements.appPickerBody.innerHTML = "";
 }
@@ -653,14 +654,66 @@ function renderDatePicker() {
 
 function renderTimePicker() {
   const selected = pickerState.target?.value || "17:30";
-  const options = [];
-  for (let hour = 0; hour < 24; hour += 1) {
-    for (let minute = 0; minute < 60; minute += 15) {
-      const value = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-      options.push(`<button class="picker-option ${value === selected ? "active" : ""}" type="button" data-picker-value="${value}">${value}</button>`);
-    }
-  }
-  elements.appPickerBody.innerHTML = `<div class="picker-options-grid time-grid">${options.join("")}</div>`;
+  const [selectedHour = "17", selectedMinute = "30"] = selected.split(":");
+  pickerState.hour = selectedHour.padStart(2, "0");
+  pickerState.minute = selectedMinute.padStart(2, "0");
+  const hours = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
+  const minutes = Array.from({ length: 60 }, (_, minute) => String(minute).padStart(2, "0"));
+  const column = (label, values, active, key) => `
+    <div class="time-wheel-column" data-time-column="${key}">
+      <span>${label}</span>
+      <div class="time-wheel-scroll" data-time-scroll="${key}" tabindex="0" aria-label="${label}">
+        <div class="time-wheel-spacer" aria-hidden="true"></div>
+        ${values.map((value) => `
+          <button class="time-wheel-option ${value === active ? "active" : ""}" type="button" data-time-part="${key}" data-time-value="${value}">
+            ${value}
+          </button>
+        `).join("")}
+        <div class="time-wheel-spacer" aria-hidden="true"></div>
+      </div>
+    </div>
+  `;
+
+  elements.appPickerBody.innerHTML = `
+    <div class="time-wheel">
+      <div class="time-wheel-highlight" aria-hidden="true"></div>
+      ${column("Часы", hours, pickerState.hour, "hour")}
+      <span class="time-wheel-divider" aria-hidden="true">:</span>
+      ${column("Минуты", minutes, pickerState.minute, "minute")}
+    </div>
+    <button class="submit-button picker-confirm" type="button" data-picker-time-confirm>
+      Выбрать ${pickerState.hour}:${pickerState.minute}
+    </button>
+  `;
+
+  window.requestAnimationFrame(() => {
+    elements.appPickerBody.querySelectorAll(".time-wheel-option.active").forEach((option) => {
+      option.scrollIntoView({ block: "center" });
+    });
+  });
+}
+
+function updateTimeWheelClasses(part, value) {
+  pickerState[part] = value;
+  elements.appPickerBody.querySelectorAll(`[data-time-part="${part}"]`).forEach((option) => {
+    option.classList.toggle("active", option.dataset.timeValue === value);
+  });
+  const confirm = elements.appPickerBody.querySelector("[data-picker-time-confirm]");
+  if (confirm) confirm.textContent = `Выбрать ${pickerState.hour}:${pickerState.minute}`;
+}
+
+function selectNearestTimeWheelValue(scroll) {
+  const part = scroll.dataset.timeScroll;
+  const options = [...scroll.querySelectorAll(".time-wheel-option")];
+  const scrollCenter = scroll.getBoundingClientRect().top + scroll.clientHeight / 2;
+  const nearest = options
+    .map((option) => {
+      const rect = option.getBoundingClientRect();
+      return { option, distance: Math.abs(rect.top + rect.height / 2 - scrollCenter) };
+    })
+    .sort((a, b) => a.distance - b.distance)[0]?.option;
+
+  if (nearest) updateTimeWheelClasses(part, nearest.dataset.timeValue);
 }
 
 function renderSelectPicker() {
@@ -678,7 +731,10 @@ function openAppPicker(button) {
   pickerState = {
     target: field,
     type: button.dataset.picker,
-    month: field.value ? new Date(`${field.value}T12:00`) : new Date(),
+    month: button.dataset.picker === "date" && field.value ? new Date(`${field.value}T12:00`) : new Date(),
+    hour: "00",
+    minute: "00",
+    wheelTimer: null,
   };
   elements.appPickerTitle.textContent = button.closest("label")?.childNodes?.[0]?.textContent?.trim() || "Выбор";
   elements.appPickerSheet.hidden = false;
@@ -711,9 +767,34 @@ function setupAppPickers() {
       return;
     }
 
+    const timePartButton = event.target.closest("[data-time-value]");
+    if (timePartButton) {
+      const part = timePartButton.dataset.timePart;
+      updateTimeWheelClasses(part, timePartButton.dataset.timeValue);
+      timePartButton.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    const timeConfirm = event.target.closest("[data-picker-time-confirm]");
+    if (timeConfirm) {
+      setPickerValue(`${pickerState.hour}:${pickerState.minute}`);
+      return;
+    }
+
     const valueButton = event.target.closest("[data-picker-value]");
     if (valueButton) setPickerValue(valueButton.dataset.pickerValue);
   });
+
+  elements.appPickerSheet?.addEventListener(
+    "scroll",
+    (event) => {
+      const scroll = event.target.closest?.("[data-time-scroll]");
+      if (!scroll) return;
+      if (pickerState.wheelTimer) window.clearTimeout(pickerState.wheelTimer);
+      pickerState.wheelTimer = window.setTimeout(() => selectNearestTimeWheelValue(scroll), 90);
+    },
+    true,
+  );
 
   syncAppPickers();
 }

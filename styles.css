@@ -2615,6 +2615,130 @@ h2 {
   font-weight: 950;
 }
 
+.time-wheel {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 18px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(17, 21, 33, 0.92), rgba(31, 37, 55, 0.72)),
+    rgba(255, 255, 255, 0.04);
+}
+
+.time-wheel::before,
+.time-wheel::after {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  left: 0;
+  height: 52px;
+  content: "";
+  pointer-events: none;
+}
+
+.time-wheel::before {
+  top: 0;
+  background: linear-gradient(180deg, rgba(20, 25, 38, 0.98), rgba(20, 25, 38, 0));
+}
+
+.time-wheel::after {
+  bottom: 0;
+  background: linear-gradient(0deg, rgba(20, 25, 38, 0.98), rgba(20, 25, 38, 0));
+}
+
+.time-wheel-highlight {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 14px;
+  left: 14px;
+  height: 54px;
+  border: 1px solid rgba(40, 242, 156, 0.34);
+  border-radius: 16px;
+  background: rgba(40, 242, 156, 0.1);
+  transform: translateY(-50%);
+  pointer-events: none;
+  box-shadow: inset 0 0 22px rgba(40, 242, 156, 0.07);
+}
+
+.time-wheel-column {
+  position: relative;
+  z-index: 3;
+  min-width: 0;
+  padding: 10px 0;
+}
+
+.time-wheel-column > span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-align: center;
+}
+
+.time-wheel-scroll {
+  height: 210px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.time-wheel-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.time-wheel-spacer {
+  height: 78px;
+}
+
+.time-wheel-option {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 52px;
+  border: 0;
+  border-radius: 15px;
+  background: transparent;
+  color: rgba(244, 247, 251, 0.52);
+  font-size: 1.45rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  scroll-snap-align: center;
+  transform: scale(0.92);
+  transition:
+    color 0.16s ease,
+    transform 0.16s ease;
+}
+
+.time-wheel-option.active {
+  color: var(--profit);
+  font-size: 1.68rem;
+  transform: scale(1);
+  text-shadow: 0 0 22px rgba(40, 242, 156, 0.32);
+}
+
+.time-wheel-divider {
+  position: relative;
+  z-index: 3;
+  color: rgba(244, 247, 251, 0.74);
+  font-size: 2rem;
+  font-weight: 950;
+  text-align: center;
+}
+
+.picker-confirm {
+  min-height: 54px;
+}
+
 @keyframes picker-spin {
   to {
     transform: rotate(360deg);
