@@ -10,11 +10,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="TaxiProfit - мобильный cockpit для учета смен, расходов и прибыли водителя такси." />
     <title>TaxiProfit</title>
-    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260526-1" />
+    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260526-2" />
     <link rel="icon" href="assets/icons/taxiprofit-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/icons/taxiprofit-icon.svg" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=telegram-20260526-1" />
+    <link rel="stylesheet" href="styles.css?v=telegram-20260526-2" />
   </head>
   <body>
     <section class="onboarding-overlay" id="onboardingOverlay" hidden aria-label="Регистрация водителя">
@@ -26,9 +26,9 @@
         <div class="onboarding-step active" data-onboarding-step="welcome">
           <div class="onboarding-logo" aria-hidden="true">🚖</div>
           <span class="section-kicker">TaxiProfit</span>
-          <h1>Добро пожаловать</h1>
-          <p>Настроим профиль водителя, авто и рабочие агрегаторы, чтобы аналитика считала прибыль честно.</p>
-          <button class="submit-button" type="button" id="onboardingStart">Начать</button>
+          <h1>Настроим кабинет водителя</h1>
+          <p>Telegram ID уже привязан к приложению. Осталось указать авто, пробег и расход, чтобы TaxiProfit считал смены и аналитику под тебя.</p>
+          <button class="submit-button" type="button" id="onboardingStart">Создать профиль</button>
         </div>
 
         <div class="onboarding-step" data-onboarding-step="carType">
@@ -45,6 +45,10 @@
           <span class="section-kicker">Шаг 2</span>
           <h2>Данные авто</h2>
           <div class="form-grid onboarding-form-grid">
+            <label class="wide-field">
+              Имя водителя
+              <input name="driverName" type="text" autocomplete="name" placeholder="Юрий" />
+            </label>
             <label>
               Марка авто
               <select name="carBrand" id="onboardingCarBrand"></select>
@@ -54,26 +58,12 @@
               <select name="carModel" id="onboardingCarModel"></select>
             </label>
             <label>
-              Год
-              <select name="carYear" id="onboardingCarYear"></select>
-            </label>
-            <label>
-              Тип топлива
-              <select name="fuelType">
-                <option value="Бензин">Бензин</option>
-                <option value="Дизель">Дизель</option>
-                <option value="Газ">Газ</option>
-                <option value="Гибрид">Гибрид</option>
-                <option value="Электро">Электро</option>
-              </select>
+              Текущий пробег
+              <input name="odometer" type="number" min="0" step="0.1" placeholder="125430" />
             </label>
             <label>
               Средний расход, л/100км
               <input name="fuelConsumption" type="number" min="0" step="0.1" placeholder="6.5" />
-            </label>
-            <label>
-              Текущий пробег
-              <input name="odometer" type="number" min="0" step="0.1" placeholder="125430" />
             </label>
           </div>
         </div>
@@ -796,24 +786,31 @@
               <span class="section-kicker">Кабинет</span>
               <h1>Профиль водителя</h1>
             </div>
+            <button class="ghost-button" type="button" id="editProfileButton">Редактировать</button>
           </div>
 
-          <div class="profile-grid">
-            <article class="profile-card auth-card compact-profile-card">
-              <span class="profile-card-label">Аккаунт</span>
-              <strong id="authStatusTitle">Профиль подключен</strong>
-              <p id="authStatusText">Данные сохраняются в Supabase и синхронизируются между устройствами.</p>
-            </article>
-
-            <div class="profile-card auth-form compact-profile-card">
-              <span class="profile-card-label">Сессия</span>
-              <strong id="profileDriverLabel">Водитель</strong>
-              <p id="profileCarLabel">Авто не указано</p>
-              <button class="ghost-button danger" type="button" id="signOutButton">Выйти</button>
+          <article class="profile-summary-card" id="profileSummaryCard">
+            <div class="profile-summary-head">
+              <div>
+                <span class="profile-card-label">Зарегистрирован</span>
+                <strong id="profileDriverLabel">Водитель</strong>
+                <p id="profileCarLabel">Авто не указано</p>
+              </div>
+              <span class="profile-status-pill" id="profileRegisteredStatus">Профиль активен</span>
             </div>
-          </div>
+            <div class="profile-facts-grid">
+              <div>
+                <span>Пробег</span>
+                <strong id="profileOdometerLabel">— км</strong>
+              </div>
+              <div>
+                <span>Расход топлива</span>
+                <strong id="profileFuelLabel">— л/100 км</strong>
+              </div>
+            </div>
+          </article>
 
-          <form class="profile-settings-form" id="profileForm">
+          <form class="profile-settings-form" id="profileForm" hidden>
             <div class="section-head tight">
               <div>
                 <span class="section-kicker ai">Данные водителя</span>
@@ -844,10 +841,6 @@
                 <input name="driverName" type="text" autocomplete="name" placeholder="Юрий" />
               </label>
               <label>
-                Город
-                <input name="city" type="text" placeholder="Киев" />
-              </label>
-              <label>
                 Марка авто
                 <input name="carBrand" type="text" placeholder="Toyota" />
               </label>
@@ -856,26 +849,39 @@
                 <input name="carModel" type="text" placeholder="Prius" />
               </label>
               <label>
-                Основная платформа
-                <select name="defaultPlatform">
-                  <option value="Bolt">Bolt</option>
-                  <option value="Uklon">Uklon</option>
-                  <option value="InDrive">InDrive</option>
-                </select>
+                Пробег, км
+                <input name="odometer" type="number" min="0" step="0.1" inputmode="decimal" placeholder="125430.5" />
               </label>
               <label>
-                Телефон
-                <input name="phone" type="tel" autocomplete="tel" placeholder="+380..." />
-              </label>
-              <label>
-                Номер авто
-                <input name="carNumber" type="text" placeholder="AA 0000 AA" />
+                Расход топлива, л/100 км
+                <input name="fuelConsumption" type="number" min="0" step="0.1" inputmode="decimal" placeholder="6.5" />
               </label>
             </div>
 
-            <button class="submit-button" type="submit">Сохранить кабинет</button>
+            <div class="profile-form-actions">
+              <button class="ghost-button" type="button" id="cancelProfileEdit">Отмена</button>
+              <button class="submit-button" type="submit">Сохранить кабинет</button>
+            </div>
             <p class="profile-note" id="profileSaveStatus">Профиль будет храниться в Supabase и использоваться для привязки данных к пользователю.</p>
           </form>
+
+          <div class="profile-grid profile-system-grid">
+            <article class="profile-card auth-card compact-profile-card">
+              <span class="profile-card-label">Аккаунт</span>
+              <strong id="authStatusTitle">Профиль подключен</strong>
+              <p id="authStatusText">Данные сохраняются в Supabase и синхронизируются между устройствами.</p>
+            </article>
+
+            <div class="profile-card auth-form compact-profile-card">
+              <span class="profile-card-label">Сессия</span>
+              <strong id="profileSessionLabel">Telegram ID</strong>
+              <p id="profileSessionText">Кабинет водителя</p>
+              <div class="profile-danger-actions">
+                <button class="ghost-button" type="button" id="signOutButton">Выйти</button>
+                <button class="ghost-button danger" type="button" id="deleteProfileButton">Удалить профиль</button>
+              </div>
+            </div>
+          </div>
         </section>
       </main>
     </div>
@@ -893,6 +899,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=telegram-20260526-1"></script>
+    <script src="app.js?v=telegram-20260526-2"></script>
   </body>
 </html>

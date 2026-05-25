@@ -1167,6 +1167,7 @@ body.telegram-mini-app .side-menu {
 }
 
 .profile-card,
+.profile-summary-card,
 .profile-settings-form {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 24px;
@@ -1175,6 +1176,87 @@ body.telegram-mini-app .side-menu {
     radial-gradient(circle at 12% 0%, rgba(40, 242, 156, 0.14), transparent 38%),
     linear-gradient(145deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.035));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.profile-summary-card {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.profile-summary-card[hidden],
+.profile-settings-form[hidden] {
+  display: none;
+}
+
+.profile-summary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.profile-summary-head strong {
+  display: block;
+  color: var(--text);
+  font-size: clamp(1.65rem, 4vw, 2.45rem);
+  font-weight: 950;
+}
+
+.profile-summary-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.profile-status-pill {
+  flex: 0 0 auto;
+  display: inline-grid;
+  min-height: 34px;
+  place-items: center;
+  border: 1px solid rgba(40, 242, 156, 0.32);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: rgba(40, 242, 156, 0.1);
+  color: var(--profit);
+  font-size: 0.76rem;
+  font-weight: 950;
+}
+
+.profile-status-pill.muted {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+}
+
+.profile-facts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profile-facts-grid div {
+  min-width: 0;
+  border-radius: 18px;
+  padding: 15px;
+  background: rgba(5, 11, 18, 0.26);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.profile-facts-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.profile-facts-grid strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--text);
+  font-size: clamp(1.25rem, 4vw, 1.85rem);
+  font-weight: 950;
+  overflow-wrap: anywhere;
 }
 
 .profile-card-label {
@@ -1274,6 +1356,52 @@ body.telegram-mini-app .side-menu {
 
 .profile-form-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.profile-form-actions {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.38fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.profile-system-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.compact-profile-card {
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025)),
+    rgba(255, 255, 255, 0.02);
+}
+
+.compact-profile-card .profile-card-label {
+  margin-bottom: 4px;
+  font-size: 0.7rem;
+}
+
+.compact-profile-card strong {
+  font-size: 1rem;
+}
+
+.compact-profile-card p {
+  margin-top: 4px;
+  font-size: 0.82rem;
+}
+
+.profile-danger-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ghost-button.danger {
+  border-color: rgba(255, 101, 132, 0.35);
+  color: #ff8aa3;
 }
 
 .history-view,
@@ -3211,6 +3339,8 @@ h2 {
   .data-grid,
   .profile-grid,
   .profile-form-grid,
+  .profile-facts-grid,
+  .profile-form-actions,
   .onboarding-form-grid,
   .data-intro,
   .finish-grid,
@@ -3225,7 +3355,8 @@ h2 {
   }
 
   .onboarding-actions,
-  .auth-email-line {
+  .auth-email-line,
+  .profile-danger-actions {
     grid-template-columns: 1fr;
   }
 
@@ -3453,9 +3584,14 @@ h2 {
   }
 
   .profile-card,
+  .profile-summary-card,
   .profile-settings-form {
     border-radius: 18px;
     padding: 15px;
+  }
+
+  .profile-summary-head {
+    display: grid;
   }
 
   .profile-facts div {
