@@ -1312,7 +1312,6 @@ function renderProfile(message = "") {
       : "Профиль будет создан автоматически при первом запуске.";
   }
   if (elements.profileForm) elements.profileForm.hidden = !isProfileEditing;
-  if (elements.profileSummaryCard) elements.profileSummaryCard.hidden = isProfileEditing;
   if (elements.editProfileButton) elements.editProfileButton.textContent = isProfileEditing ? "Закрыть" : "Редактировать";
   if (elements.authMessage && message) elements.authMessage.textContent = message;
   if (elements.profileSaveStatus && message) elements.profileSaveStatus.textContent = message;
