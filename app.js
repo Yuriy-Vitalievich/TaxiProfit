@@ -1266,6 +1266,7 @@ function renderProfile(message = "") {
   if (elements.authMessage && message) elements.authMessage.textContent = message;
   if (elements.profileSaveStatus && message) elements.profileSaveStatus.textContent = message;
   fillProfileForm();
+  syncStartOdometerDefault();
   updateAccessFlow();
 }
 
@@ -1801,6 +1802,33 @@ function shiftExpenses(shift) {
   return Number(shift.fuel || 0) + Number(shift.rent || 0) + Number(shift.other || shift.wash || 0) + Number(shift.fees || 0);
 }
 
+function shiftActualKm(shift) {
+  const totalKm = Number(shift.totalKm || 0);
+  if (totalKm > 0) return totalKm;
+  const start = Number(shift.odometerStart || 0);
+  const end = Number(shift.odometerEnd || 0);
+  if (start > 0 && end > start) return end - start;
+  return Number(shift.km || 0);
+}
+
+function latestKnownOdometer() {
+  const candidates = shifts
+    .flatMap((shift) => [Number(shift.odometerEnd || 0), Number(shift.odometerStart || 0)])
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const profileOdometer = Number(userProfile.odometer || 0);
+  if (profileOdometer > 0) candidates.push(profileOdometer);
+  return candidates.length ? Math.max(...candidates) : 0;
+}
+
+function syncStartOdometerDefault() {
+  if (!elements.startOdometer || activeShift || pendingShiftFinish) return;
+  const odometer = latestKnownOdometer();
+  if (odometer > 0 && !elements.startOdometer.value) {
+    elements.startOdometer.value = Number(odometer.toFixed(1));
+  }
+  if (odometer > 0) elements.startOdometer.placeholder = Number(odometer.toFixed(1));
+}
+
 function net(shift) {
   if (shift.netValue !== undefined && shift.netValue !== "" && Number.isFinite(Number(shift.netValue))) {
     return Number(shift.netValue);
@@ -1836,6 +1864,7 @@ function normalizeShift(shift) {
     odometerEnd: Number(shift.odometerEnd || 0),
     totalKm: Number(shift.totalKm || 0),
     extraKm: Number(shift.extraKm || 0),
+    actualKm: Number(shift.actualKm || shift.totalKm || 0),
     ordersBolt: Number(shift.ordersBolt || 0),
     ordersUklon: Number(shift.ordersUklon || 0),
     ordersCash: Number(shift.ordersCash || 0),
@@ -2111,6 +2140,81 @@ function currentRange(period) {
   });
 }
 
+function allDataBounds() {
+  const dateValues = [
+    ...shifts.map((shift) => shift.date),
+    ...expenses.map((expense) => expense.date),
+    dateKey(new Date()),
+  ].filter(Boolean).sort();
+
+  return {
+    start: new Date(`${dateValues[0]}T00:00:00`),
+    end: new Date(`${dateValues[dateValues.length - 1]}T23:59:59.999`),
+  };
+}
+
+function expenseBreakdown(sourceExpenses = []) {
+  const fuel = sumExpensesByCategory(sourceExpenses, ["Топливо"]);
+  const rent = sumExpensesByCategory(sourceExpenses, ["Аренда авто", "Аренда"]);
+  const wash = sumExpensesByCategory(sourceExpenses, ["Мойка"]);
+  const fine = sumExpensesByCategory(sourceExpenses, ["Штраф"]);
+  const repair = sumExpensesByCategory(sourceExpenses, ["Ремонт"]);
+  const fees = sumExpensesByCategory(sourceExpenses, ["Комиссии"]);
+  const other = sumExpensesByCategory(sourceExpenses, ["Прочее"]);
+  return {
+    fuel,
+    rent,
+    wash,
+    fine,
+    repair,
+    fees,
+    other,
+    expenses: fuel + rent + wash + fine + repair + fees + other,
+  };
+}
+
+function profileWeeklyRentAmount() {
+  const amount = Number(userProfile.rentAmount || 0);
+  if (!amount || !["rent", "fleet"].includes(userProfile.carOwnership)) return 0;
+  if (userProfile.rentFrequency === "day") return amount * 7;
+  if (userProfile.rentFrequency === "month") return (amount / 30) * 7;
+  return amount;
+}
+
+function weekExpensesForDate(date) {
+  const start = weekStart(new Date(`${date}T12:00`));
+  const end = endOfDay(addDays(start, 6));
+  const weekExpenses = expenses.filter((expense) => {
+    const value = new Date(`${expense.date}T12:00`);
+    return value >= start && value <= end;
+  });
+  const breakdown = expenseBreakdown(weekExpenses);
+  const profileRent = profileWeeklyRentAmount();
+  if (profileRent > 0 && breakdown.rent <= 0) {
+    breakdown.rent = profileRent;
+    breakdown.expenses += profileRent;
+  }
+  return breakdown;
+}
+
+function dailyAllocatedExpenses(date) {
+  const weekly = weekExpensesForDate(date);
+  return Object.fromEntries(
+    Object.entries(weekly).map(([key, value]) => [key, Number(value || 0) / 7]),
+  );
+}
+
+function allocatedExpensesForRange(start, end) {
+  const total = { fuel: 0, rent: 0, wash: 0, fine: 0, repair: 0, fees: 0, other: 0, expenses: 0 };
+  for (let day = new Date(start); day <= end; day = addDays(day, 1)) {
+    const daily = dailyAllocatedExpenses(dateKey(day));
+    Object.keys(total).forEach((key) => {
+      total[key] += Number(daily[key] || 0);
+    });
+  }
+  return total;
+}
+
 function expenseRange(period) {
   if (period === "all") return expenses;
 
@@ -2128,7 +2232,8 @@ function percentChange(current, previous) {
 
 function periodSummary(period) {
   const current = currentRange(period);
-  const currentExpenses = expenseRange(period);
+  const bounds = period === "all" ? allDataBounds() : periodBounds(period);
+  const allocatedExpenses = allocatedExpensesForRange(bounds.start, bounds.end);
   const workedDays = new Set(current.filter(isWorkShift).map((shift) => shift.date).filter(Boolean));
   const calendarDays = dayRecords(period);
   const shiftsWorked = workedDays.size;
@@ -2137,17 +2242,19 @@ function periodSummary(period) {
   const gross = sum(current, "gross");
   const orders = current.reduce((total, shift) => total + totalOrders(shift), 0);
   const km = sum(current, "km");
+  const actualKm = current.reduce((total, shift) => total + shiftActualKm(shift), 0);
+  const extraKm = current.reduce((total, shift) => total + Math.max(0, shiftActualKm(shift) - Number(shift.km || 0)), 0);
   const embeddedFuel = sum(current, "fuel");
   const embeddedRent = sum(current, "rent");
   const embeddedOther = sum(current, "other");
   const embeddedFees = sum(current, "fees");
-  const fuel = embeddedFuel + sumExpensesByCategory(currentExpenses, ["Топливо"]);
-  const rent = embeddedRent + sumExpensesByCategory(currentExpenses, ["Аренда авто", "Аренда"]);
-  const wash = sumExpensesByCategory(currentExpenses, ["Мойка"]);
-  const fine = sumExpensesByCategory(currentExpenses, ["Штраф"]);
-  const repair = sumExpensesByCategory(currentExpenses, ["Ремонт"]);
-  const other = embeddedOther + sumExpensesByCategory(currentExpenses, ["Прочее"]);
-  const fees = embeddedFees + sumExpensesByCategory(currentExpenses, ["Комиссии"]);
+  const fuel = embeddedFuel + allocatedExpenses.fuel;
+  const rent = embeddedRent + allocatedExpenses.rent;
+  const wash = allocatedExpenses.wash;
+  const fine = allocatedExpenses.fine;
+  const repair = allocatedExpenses.repair;
+  const other = embeddedOther + allocatedExpenses.other;
+  const fees = embeddedFees + allocatedExpenses.fees;
   const expensesTotal = fuel + rent + wash + fine + repair + fees + other;
   const currentNet = gross - expensesTotal;
 
@@ -2160,6 +2267,8 @@ function periodSummary(period) {
     hours,
     orders,
     km,
+    actualKm,
+    extraKm,
     perHour: hours ? currentNet / hours : 0,
     avgRevenue: shiftsWorked ? gross / shiftsWorked : 0,
     avgExpenses: shiftsWorked ? expensesTotal / shiftsWorked : 0,
@@ -2167,6 +2276,8 @@ function periodSummary(period) {
     avgOrders: shiftsWorked ? orders / shiftsWorked : 0,
     avgKm: shiftsWorked ? km / shiftsWorked : 0,
     avgKmPrice: km ? gross / km : 0,
+    cleanKmPrice: actualKm ? currentNet / actualKm : 0,
+    grossActualKmPrice: actualKm ? gross / actualKm : 0,
     fuel,
     rent,
     wash,
@@ -2185,13 +2296,16 @@ function summarizeEntries(sourceShifts, sourceExpenses = []) {
   const gross = sum(sourceShifts, "gross");
   const orders = sourceShifts.reduce((total, shift) => total + totalOrders(shift), 0);
   const km = sum(sourceShifts, "km");
-  const fuel = sum(sourceShifts, "fuel") + sumExpensesByCategory(sourceExpenses, ["Топливо"]);
-  const rent = sum(sourceShifts, "rent") + sumExpensesByCategory(sourceExpenses, ["Аренда авто", "Аренда"]);
-  const wash = sumExpensesByCategory(sourceExpenses, ["Мойка"]);
-  const fine = sumExpensesByCategory(sourceExpenses, ["Штраф"]);
-  const repair = sumExpensesByCategory(sourceExpenses, ["Ремонт"]);
-  const other = sum(sourceShifts, "other") + sumExpensesByCategory(sourceExpenses, ["Прочее"]);
-  const fees = sum(sourceShifts, "fees") + sumExpensesByCategory(sourceExpenses, ["Комиссии"]);
+  const actualKm = sourceShifts.reduce((total, shift) => total + shiftActualKm(shift), 0);
+  const extraKm = sourceShifts.reduce((total, shift) => total + Math.max(0, shiftActualKm(shift) - Number(shift.km || 0)), 0);
+  const directExpenses = expenseBreakdown(sourceExpenses);
+  const fuel = sum(sourceShifts, "fuel") + directExpenses.fuel;
+  const rent = sum(sourceShifts, "rent") + directExpenses.rent;
+  const wash = directExpenses.wash;
+  const fine = directExpenses.fine;
+  const repair = directExpenses.repair;
+  const other = sum(sourceShifts, "other") + directExpenses.other;
+  const fees = sum(sourceShifts, "fees") + directExpenses.fees;
   const expensesTotal = fuel + rent + wash + fine + repair + fees + other;
 
   return {
@@ -2200,7 +2314,11 @@ function summarizeEntries(sourceShifts, sourceExpenses = []) {
     hours,
     orders,
     km,
+    actualKm,
+    extraKm,
     net: gross ? gross - expensesTotal : 0,
+    cleanKmPrice: actualKm ? (gross - expensesTotal) / actualKm : 0,
+    grossActualKmPrice: actualKm ? gross / actualKm : 0,
     expenses: expensesTotal,
     fuel,
     rent,
@@ -2213,9 +2331,44 @@ function summarizeEntries(sourceShifts, sourceExpenses = []) {
 }
 
 function summaryForDate(date) {
+  const dayShifts = shifts.filter((shift) => shift.date === date);
+  const embeddedExpenses = dayShifts.reduce(
+    (total, shift) => {
+      total.fuel += Number(shift.fuel || 0);
+      total.rent += Number(shift.rent || 0);
+      total.other += Number(shift.other || 0);
+      total.fees += Number(shift.fees || 0);
+      return total;
+    },
+    { fuel: 0, rent: 0, wash: 0, fine: 0, repair: 0, fees: 0, other: 0, expenses: 0 },
+  );
+  const allocated = dailyAllocatedExpenses(date);
+  const sourceExpenses = [{
+    category: "Топливо",
+    amount: allocated.fuel + embeddedExpenses.fuel,
+  }, {
+    category: "Аренда авто",
+    amount: allocated.rent + embeddedExpenses.rent,
+  }, {
+    category: "Мойка",
+    amount: allocated.wash,
+  }, {
+    category: "Штраф",
+    amount: allocated.fine,
+  }, {
+    category: "Ремонт",
+    amount: allocated.repair,
+  }, {
+    category: "Комиссии",
+    amount: allocated.fees + embeddedExpenses.fees,
+  }, {
+    category: "Прочее",
+    amount: allocated.other + embeddedExpenses.other,
+  }];
+
   return summarizeEntries(
-    shifts.filter((shift) => shift.date === date),
-    expenses.filter((expense) => expense.date === date)
+    dayShifts.map((shift) => ({ ...shift, fuel: 0, rent: 0, other: 0, fees: 0 })),
+    sourceExpenses,
   );
 }
 
@@ -2226,13 +2379,52 @@ function currentWeekSummary() {
     const value = dateValue(shift);
     return value >= start && value <= end;
   });
-  const weekExpenses = expenses.filter((expense) => {
-    const value = new Date(`${expense.date}T12:00`);
-    return value >= start && value <= end;
-  });
+  const allocatedExpenses = allocatedExpensesForRange(start, endOfDay(end));
+  const workedDays = new Set(weekShifts.filter(isWorkShift).map((shift) => shift.date).filter(Boolean));
+  const shiftsWorked = workedDays.size;
+  const hours = sum(weekShifts, "hours");
+  const gross = sum(weekShifts, "gross");
+  const orders = weekShifts.reduce((total, shift) => total + totalOrders(shift), 0);
+  const km = sum(weekShifts, "km");
+  const actualKm = weekShifts.reduce((total, shift) => total + shiftActualKm(shift), 0);
+  const extraKm = weekShifts.reduce((total, shift) => total + Math.max(0, shiftActualKm(shift) - Number(shift.km || 0)), 0);
+  const fuel = sum(weekShifts, "fuel") + allocatedExpenses.fuel;
+  const rent = sum(weekShifts, "rent") + allocatedExpenses.rent;
+  const wash = allocatedExpenses.wash;
+  const fine = allocatedExpenses.fine;
+  const repair = allocatedExpenses.repair;
+  const other = sum(weekShifts, "other") + allocatedExpenses.other;
+  const fees = sum(weekShifts, "fees") + allocatedExpenses.fees;
+  const expensesTotal = fuel + rent + wash + fine + repair + fees + other;
+  const currentNet = gross - expensesTotal;
 
   return {
-    ...summarizeEntries(weekShifts, weekExpenses),
+    shiftsWorked,
+    daysOff: 7 - shiftsWorked,
+    net: currentNet,
+    gross,
+    hours,
+    orders,
+    km,
+    actualKm,
+    extraKm,
+    perHour: hours ? currentNet / hours : 0,
+    avgRevenue: shiftsWorked ? gross / shiftsWorked : 0,
+    avgExpenses: shiftsWorked ? expensesTotal / shiftsWorked : 0,
+    avgProfit: shiftsWorked ? currentNet / shiftsWorked : 0,
+    avgOrders: shiftsWorked ? orders / shiftsWorked : 0,
+    avgKm: shiftsWorked ? km / shiftsWorked : 0,
+    avgKmPrice: km ? gross / km : 0,
+    cleanKmPrice: actualKm ? currentNet / actualKm : 0,
+    grossActualKmPrice: actualKm ? gross / actualKm : 0,
+    fuel,
+    rent,
+    wash,
+    fine,
+    repair,
+    fees,
+    other,
+    expenses: expensesTotal,
     start,
     end,
   };
@@ -2337,7 +2529,7 @@ function renderMetrics(period) {
   elements.avgRevenueText.textContent = `${money(summary.avgRevenue)} за смену`;
   elements.avgExpenseText.textContent = `${money(summary.avgExpenses)} за смену`;
   elements.avgOpsText.textContent = `${Number(summary.avgOrders.toFixed(1))} заказов · ${Number(summary.avgKm.toFixed(1))} км за смену`;
-  elements.avgKmPriceText.textContent = `${money(summary.avgKmPrice)} за км`;
+  elements.avgKmPriceText.textContent = `${money(summary.cleanKmPrice)} за реальный км`;
 
   renderHomeMetrics();
   renderExpenses(summary);
@@ -2361,7 +2553,9 @@ function renderHomeMetrics() {
   const todayDifference = todaySummary.gross - yesterdaySummary.gross;
   const averageHourGross = week.hours ? week.gross / week.hours : 0;
   const averageOrderGross = week.orders ? week.gross / week.orders : 0;
-  const averageKmPrice = week.km ? week.gross / week.km : 0;
+  const cleanKmPrice = week.cleanKmPrice || 0;
+  const emptyMileageShare = week.actualKm ? Math.round((week.extraKm / week.actualKm) * 100) : 0;
+  const qualityOk = cleanKmPrice >= 25;
   const paceLabel = forecast >= weekGoalValue ? "выше плана" : "ниже плана";
 
   elements.homeNetProfit.textContent = money(todaySummary.gross);
@@ -2388,8 +2582,9 @@ function renderHomeMetrics() {
   elements.homeAvgHourText.textContent = `${money(week.gross)} выручка · ${Number(week.hours.toFixed(1))} ч`;
   elements.homeAvgOrderText.textContent = `${money(averageOrderGross)} за заказ`;
   elements.homeWeekCleanText.textContent = `${money(week.net)} чистыми · ${money(week.expenses)} расходы`;
-  elements.homeOpsText.textContent = `${Number(week.hours.toFixed(1))} ч · ${Number(week.km.toFixed(1))} км`;
-  elements.homeKmPriceText.textContent = `${money(averageKmPrice)} за км`;
+  elements.homeOpsText.textContent = `${Number(week.km.toFixed(1))} км заказов · ${Number(week.actualKm.toFixed(1))} км всего · ${emptyMileageShare}% пустой`;
+  elements.homeKmPriceText.textContent = `${money(cleanKmPrice)} за реальный км · ${qualityOk ? "норма" : "ниже 25"}`;
+  elements.homeKmPriceText.className = qualityOk ? "profit" : "loss";
   renderHomeMiniBars();
 }
 
@@ -2588,9 +2783,8 @@ function dayRecords(period) {
     record.km += Number(shift.km || 0);
   });
 
-  expenses.forEach((expense) => {
-    if (!grouped.has(expense.date)) return;
-    grouped.get(expense.date).expenses = (grouped.get(expense.date).expenses || 0) + Number(expense.amount || 0);
+  grouped.forEach((record) => {
+    record.expenses = Number(dailyAllocatedExpenses(record.date).expenses || 0);
   });
 
   return [...grouped.values()]
@@ -2862,6 +3056,7 @@ function renderShiftRunner() {
   }
 
   setRunnerState("idle");
+  syncStartOdometerDefault();
 }
 
 function startRunnerShift() {
@@ -2937,6 +3132,7 @@ function runnerShiftFromForm(formData) {
     odometerStart,
     odometerEnd,
     totalKm,
+    actualKm: totalKm,
     extraKm,
     comment: [comment, odometerComment].filter(Boolean).join(" · "),
   });
@@ -3639,6 +3835,12 @@ elements.finishShiftForm?.addEventListener("submit", async (event) => {
   nextShift = await saveShiftToCloud(nextShift);
   shifts.push(nextShift);
   await sendToGoogleSheet("shift", nextShift);
+  if (Number(nextShift.odometerEnd || 0) > 0) {
+    userProfile = { ...userProfile, odometer: Number(nextShift.odometerEnd).toFixed(1) };
+    writeStorage(JSON.stringify(userProfile), PROFILE_STORAGE_KEY);
+    fillProfileForm();
+    await saveUserProfile(userProfile);
+  }
 
   saveShifts();
   clearActiveShift();
