@@ -1,10 +1,10 @@
-const CACHE_NAME = "taxiprofit-telegram-20260526-3";
+const CACHE_NAME = "taxiprofit-telegram-20260526-4";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=telegram-20260526-3",
-  "./app.js?v=telegram-20260526-3",
-  "./manifest.webmanifest?v=telegram-20260526-3",
+  "./styles.css?v=telegram-20260526-4",
+  "./app.js?v=telegram-20260526-4",
+  "./manifest.webmanifest?v=telegram-20260526-4",
   "./assets/icons/taxiprofit-icon.svg",
 ];
 

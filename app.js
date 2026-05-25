@@ -1170,6 +1170,8 @@ async function saveUserProfile(profile) {
     saveWeeklyGoal(Number(profile.weeklyGoal));
     scheduleSettingsSave();
   }
+  renderProfile("Профиль сохранен. Синхронизируем с Supabase...");
+  renderOnboarding();
 
   if (!hasCloudStorage() || !getCurrentUserId()) {
     renderProfile("Профиль сохранен локально.");
@@ -1459,12 +1461,15 @@ async function finishOnboarding() {
     defaultPlatform: userProfile.defaultPlatform || platforms[0],
     onboardingCompleted: true,
   };
-  await saveUserProfile(nextProfile);
+  saveLocalProfile(nextProfile);
+  if (Number(nextProfile.weeklyGoal) > 0) saveWeeklyGoal(Number(nextProfile.weeklyGoal));
   clearOnboardingDraft();
   renderProfile("Регистрация завершена. Профиль сохранен.");
   renderOnboarding();
   setView("home");
   history.replaceState(null, "", "#home");
+  renderAll();
+  await saveUserProfile(nextProfile);
   renderAll();
 }
 
