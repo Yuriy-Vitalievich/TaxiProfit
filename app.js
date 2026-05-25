@@ -410,6 +410,10 @@ function isProfileDeletedLocally() {
   }
 }
 
+function hasCompletedDriverProfile() {
+  return Boolean(userProfile.onboardingCompleted) && !isProfileDeletedLocally();
+}
+
 function loadOnboardingDraft() {
   const saved = readStorage(ONBOARDING_DRAFT_STORAGE_KEY);
   if (!saved) return {};
@@ -986,10 +990,12 @@ function createAuthClient() {
     updateAccessFlow();
     if (currentUser) {
       await syncTelegramAuthMetadata();
-      await ensureUserProfile();
-      await loadCloudData({ applyEmpty: true, silent: true });
-      await loadCloudSettings();
-      setupRealtimeSync({ includeSettings: true });
+      const profileReady = await ensureUserProfile();
+      if (profileReady && hasCompletedDriverProfile()) {
+        await loadCloudData({ applyEmpty: true, silent: true });
+        await loadCloudSettings();
+        setupRealtimeSync({ includeSettings: true });
+      }
       renderAll();
     }
   });
@@ -1183,18 +1189,10 @@ async function ensureUserProfile() {
       return true;
     }
 
-    const [created] = await cloudRequest("profiles", {
-      method: "POST",
-      body: profileToSupabasePayload({
-        ...userProfile,
-        weeklyGoal,
-      }),
-    });
-    saveLocalProfile(profileFromSupabase(created));
     renderProfile();
     fillOnboardingInputs();
     renderOnboarding();
-    return true;
+    return false;
   } catch (error) {
     console.warn("Profile is unavailable, using local profile.", error);
     renderProfile();
@@ -1250,7 +1248,19 @@ async function deleteCloudProfile() {
   if (!hasCloudStorage() || !requireCloudUser()) return false;
 
   try {
+    await cloudRequest("rpc/delete_current_telegram_profile_data", {
+      method: "POST",
+      body: {},
+      prefer: "return=minimal",
+    });
+    return true;
+  } catch (rpcError) {
+    console.warn("Profile RPC delete unavailable, using REST fallback.", rpcError);
+  }
+
+  try {
     const ownerQuery = cloudOwnerQuery();
+    const deleteQuery = ownerQuery ? `?${ownerQuery}` : "";
     const resetPayload = {
       driver_name: "",
       car_ownership: "",
@@ -1273,13 +1283,18 @@ async function deleteCloudProfile() {
     };
     await cloudRequest("profiles", {
       method: "PATCH",
-      query: ownerQuery ? `?${ownerQuery}` : "",
+      query: deleteQuery,
       body: resetPayload,
       prefer: "return=minimal",
     });
+    await Promise.all([
+      cloudRequest("shifts", { method: "DELETE", query: deleteQuery, prefer: "return=minimal" }),
+      cloudRequest("expenses", { method: "DELETE", query: deleteQuery, prefer: "return=minimal" }),
+      cloudRequest("settings", { method: "DELETE", query: deleteQuery, prefer: "return=minimal" }),
+    ]);
     await cloudRequest("profiles", {
       method: "DELETE",
-      query: ownerQuery ? `?${ownerQuery}` : "",
+      query: deleteQuery,
       prefer: "return=minimal",
     });
     return true;
@@ -1288,6 +1303,28 @@ async function deleteCloudProfile() {
     renderProfile("Профиль сброшен. Если старые данные появятся снова, обнови схему Supabase.");
     return true;
   }
+}
+
+async function clearCloudActivity() {
+  if (!hasCloudStorage()) return true;
+  if (!requireCloudUser()) return false;
+
+  try {
+    await cloudRequest("rpc/clear_current_telegram_activity", {
+      method: "POST",
+      body: {},
+      prefer: "return=minimal",
+    });
+    return true;
+  } catch (rpcError) {
+    console.warn("Activity RPC clear unavailable, using REST fallback.", rpcError);
+  }
+
+  const [shiftsCleared, expensesCleared] = await Promise.all([
+    replaceCloudTable("shifts", []),
+    replaceCloudTable("expenses", []),
+  ]);
+  return shiftsCleared && expensesCleared;
 }
 
 function readProfileForm() {
@@ -1626,6 +1663,7 @@ function requireCloudUser() {
 
 async function loadCloudSettings() {
   if (!hasCloudStorage() || !requireCloudUser()) return false;
+  if (!hasCompletedDriverProfile()) return false;
 
   try {
     const ownerQuery = cloudOwnerQuery();
@@ -1657,6 +1695,10 @@ async function loadCloudData({ applyEmpty = false, silent = false } = {}) {
   }
 
   if (!requireCloudUser()) return false;
+  if (!hasCompletedDriverProfile()) {
+    if (!silent) setSyncStatus("Сначала заверши регистрацию профиля, затем включится синхронизация.");
+    return false;
+  }
 
   try {
     const ownerQuery = cloudOwnerQuery();
@@ -1728,6 +1770,7 @@ function scheduleSettingsReload() {
 }
 
 function setupRealtimeSync({ includeSettings = false } = {}) {
+  if (!hasCompletedDriverProfile()) return;
   const realtimeFilter = cloudOwnerRealtimeFilter();
   if (!hasRealtimeClient() || !realtimeFilter) {
     setSyncStatus("Supabase работает через REST. Для realtime нужен supabase-js CDN.");
@@ -3743,12 +3786,17 @@ async function deleteDriverProfile() {
   if (hasCloudStorage() && requireCloudUser() && !cloudDeleted) return;
   markProfileDeleted();
   userProfile = {};
+  shifts = [];
+  expenses = [];
   isProfileEditing = false;
   clearOnboardingDraft();
   writeStorage(JSON.stringify(userProfile), PROFILE_STORAGE_KEY);
+  saveShifts();
+  saveExpenses();
   renderProfile("Профиль удален. При следующем входе регистрация откроется снова.");
   renderOnboarding();
   updateAccessFlow();
+  renderAll();
 }
 
 addTelegramSafeTap(elements.deleteProfileButton, (event) => {
@@ -4221,12 +4269,9 @@ elements.clearData.addEventListener("click", async () => {
   );
   if (!shouldClear) return;
 
-  const [shiftsCleared, expensesCleared] = await Promise.all([
-    replaceCloudTable("shifts", []),
-    replaceCloudTable("expenses", []),
-  ]);
+  const cloudCleared = await clearCloudActivity();
 
-  if (!shiftsCleared || !expensesCleared) {
+  if (!cloudCleared) {
     setSyncStatus("Не удалось очистить Supabase. Данные оставлены на месте, чтобы они не вернулись после перезагрузки.");
     return;
   }
@@ -4260,6 +4305,10 @@ renderAll();
 initializeAuth().then(async (isSignedIn) => {
   renderProfile();
   if (!isSignedIn) return;
+  if (!hasCompletedDriverProfile()) {
+    renderAll();
+    return;
+  }
   const isCloudReady = await loadCloudData();
   if (isCloudReady) {
     const hasCloudSettings = await loadCloudSettings();
