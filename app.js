@@ -5,6 +5,7 @@ const GOAL_STORAGE_KEY = "taxiProfit.weeklyGoal.v1";
 const LEGACY_GOAL_STORAGE_KEY = "taxiProfit.monthGoal.v1";
 const ACTIVE_SHIFT_STORAGE_KEY = "taxiProfit.activeShift.v1";
 const PROFILE_STORAGE_KEY = "taxiProfit.profile.v1";
+const PROFILE_DELETE_STORAGE_KEY = "taxiProfit.profileDeleted.v1";
 const ONBOARDING_DRAFT_STORAGE_KEY = "taxiProfit.onboardingDraft.v1";
 const DEFAULT_WEEKLY_GOAL = 10000;
 const ONBOARDING_STEPS = ["welcome", "carType", "vehicle", "rent", "platforms"];
@@ -222,6 +223,7 @@ const elements = {
   editProfileButton: document.querySelector("#editProfileButton"),
   cancelProfileEdit: document.querySelector("#cancelProfileEdit"),
   deleteProfileButton: document.querySelector("#deleteProfileButton"),
+  saveProfileButton: document.querySelector("#saveProfileButton"),
   profileSummaryCard: document.querySelector("#profileSummaryCard"),
   profileRegisteredStatus: document.querySelector("#profileRegisteredStatus"),
   profileOdometerLabel: document.querySelector("#profileOdometerLabel"),
@@ -375,6 +377,37 @@ function loadLocalProfile() {
 function saveLocalProfile(profile) {
   userProfile = { ...userProfile, ...(profile || {}) };
   writeStorage(JSON.stringify(userProfile), PROFILE_STORAGE_KEY);
+}
+
+function profileDeleteToken() {
+  return String(getTelegramId() || getCurrentUserId() || userProfile.userId || "");
+}
+
+function markProfileDeleted() {
+  const token = profileDeleteToken();
+  if (!token) return;
+  writeStorage(JSON.stringify({ token, deletedAt: new Date().toISOString() }), PROFILE_DELETE_STORAGE_KEY);
+}
+
+function clearProfileDeletedMarker() {
+  try {
+    localStorage.removeItem(PROFILE_DELETE_STORAGE_KEY);
+  } catch {
+    writeStorage("", PROFILE_DELETE_STORAGE_KEY);
+  }
+}
+
+function isProfileDeletedLocally() {
+  const token = profileDeleteToken();
+  if (!token) return false;
+  const saved = readStorage(PROFILE_DELETE_STORAGE_KEY);
+  if (!saved) return false;
+  try {
+    const marker = JSON.parse(saved);
+    return marker?.token === token;
+  } catch {
+    return false;
+  }
 }
 
 function loadOnboardingDraft() {
@@ -1123,6 +1156,14 @@ function profileToSupabasePayload(profile = userProfile) {
 
 async function ensureUserProfile() {
   if (!hasCloudStorage() || !getCurrentUserId()) return false;
+  if (isProfileDeletedLocally()) {
+    userProfile = {};
+    writeStorage(JSON.stringify(userProfile), PROFILE_STORAGE_KEY);
+    renderProfile();
+    fillOnboardingInputs();
+    renderOnboarding();
+    return false;
+  }
 
   try {
     const telegramId = getTelegramId();
@@ -1164,6 +1205,7 @@ async function ensureUserProfile() {
 }
 
 async function saveUserProfile(profile) {
+  if (profile?.onboardingCompleted) clearProfileDeletedMarker();
   saveLocalProfile(profile);
   if (profile.defaultPlatform) selectedRunnerPlatform = profile.defaultPlatform;
   if (Number(profile.weeklyGoal) > 0) {
@@ -1209,6 +1251,32 @@ async function deleteCloudProfile() {
 
   try {
     const ownerQuery = cloudOwnerQuery();
+    const resetPayload = {
+      driver_name: "",
+      car_ownership: "",
+      car_brand: "",
+      car_model: "",
+      car_year: null,
+      fuel_type: "",
+      fuel_consumption: null,
+      odometer: null,
+      car_number: "",
+      default_platform: "",
+      rent_amount: null,
+      rent_frequency: "",
+      rent_payment_day: "",
+      platforms: [],
+      phone: "",
+      city: "",
+      weekly_goal: DEFAULT_WEEKLY_GOAL,
+      onboarding_completed: false,
+    };
+    await cloudRequest("profiles", {
+      method: "PATCH",
+      query: ownerQuery ? `?${ownerQuery}` : "",
+      body: resetPayload,
+      prefer: "return=minimal",
+    });
     await cloudRequest("profiles", {
       method: "DELETE",
       query: ownerQuery ? `?${ownerQuery}` : "",
@@ -1216,9 +1284,9 @@ async function deleteCloudProfile() {
     });
     return true;
   } catch (error) {
-    console.warn("Profile delete failed.", error);
-    renderProfile("Не удалось удалить профиль в Supabase. Попробуй еще раз.");
-    return false;
+    console.warn("Profile delete fallback used.", error);
+    renderProfile("Профиль сброшен. Если старые данные появятся снова, обнови схему Supabase.");
+    return true;
   }
 }
 
@@ -1419,7 +1487,7 @@ function readOnboardingInputs() {
 
   onboardingDraft = {
     ...onboardingDraft,
-    driverName: textValue("driverName"),
+    driverName: textValue("driverName") || telegramDisplayName() || userProfile.driverName || "",
     carBrand: textValue("carBrand"),
     carModel: textValue("carModel"),
     carYear: numberValue("carYear"),
@@ -1446,7 +1514,6 @@ function fillOnboardingInputs() {
 function validateOnboardingStep() {
   const step = currentOnboardingStep();
   if (step === "carType" && !onboardingDraft.carOwnership) return "Выбери тип авто.";
-  if (step === "vehicle" && !String(onboardingDraft.driverName || "").trim()) return "Укажи имя водителя.";
   if (step === "platforms" && !(onboardingDraft.platforms || []).length) return "Выбери хотя бы один агрегатор.";
   return "";
 }
@@ -1457,10 +1524,13 @@ async function finishOnboarding() {
   const nextProfile = {
     ...userProfile,
     ...onboardingDraft,
+    driverName: onboardingDraft.driverName || userProfile.driverName || telegramDisplayName() || "",
+    displayName: userProfile.displayName || telegramDisplayName() || onboardingDraft.driverName || "",
     platforms,
     defaultPlatform: userProfile.defaultPlatform || platforms[0],
     onboardingCompleted: true,
   };
+  clearProfileDeletedMarker();
   saveLocalProfile(nextProfile);
   if (Number(nextProfile.weeklyGoal) > 0) saveWeeklyGoal(Number(nextProfile.weeklyGoal));
   clearOnboardingDraft();
@@ -3614,30 +3684,64 @@ elements.signOutButton?.addEventListener("click", async () => {
   setSyncStatus("Вход отключен: работаем с локальной копией.");
 });
 
+function addTelegramSafeTap(element, handler) {
+  if (!element) return;
+  let lastRun = 0;
+  const run = (event) => {
+    const now = Date.now();
+    if (now - lastRun < 320) {
+      event.preventDefault();
+      return;
+    }
+    lastRun = now;
+    handler(event);
+  };
+  element.addEventListener("click", run);
+  element.addEventListener("pointerup", (event) => {
+    if (event.pointerType === "mouse") return;
+    run(event);
+  });
+}
+
+async function submitProfileForm() {
+  isProfileEditing = false;
+  saveLocalProfile(readProfileForm());
+  renderProfile("Профиль сохранен.");
+  renderAll();
+  await saveUserProfile(userProfile);
+  renderAll();
+}
+
 elements.profileForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  isProfileEditing = false;
-  await saveUserProfile(readProfileForm());
-  renderAll();
+  await submitProfileForm();
 });
 
-elements.editProfileButton?.addEventListener("click", () => {
+addTelegramSafeTap(elements.saveProfileButton, (event) => {
+  event.preventDefault();
+  submitProfileForm();
+});
+
+addTelegramSafeTap(elements.editProfileButton, (event) => {
+  event.preventDefault();
   isProfileEditing = !isProfileEditing;
   fillProfileForm();
   renderProfile();
 });
 
-elements.cancelProfileEdit?.addEventListener("click", () => {
+addTelegramSafeTap(elements.cancelProfileEdit, (event) => {
+  event.preventDefault();
   isProfileEditing = false;
   fillProfileForm();
   renderProfile();
 });
 
-elements.deleteProfileButton?.addEventListener("click", async () => {
+async function deleteDriverProfile() {
   const confirmed = window.confirm("Удалить профиль водителя? Смены и расходы останутся, но регистрация и настройки кабинета будут очищены.");
   if (!confirmed) return;
   const cloudDeleted = await deleteCloudProfile();
   if (hasCloudStorage() && requireCloudUser() && !cloudDeleted) return;
+  markProfileDeleted();
   userProfile = {};
   isProfileEditing = false;
   clearOnboardingDraft();
@@ -3645,21 +3749,29 @@ elements.deleteProfileButton?.addEventListener("click", async () => {
   renderProfile("Профиль удален. При следующем входе регистрация откроется снова.");
   renderOnboarding();
   updateAccessFlow();
+}
+
+addTelegramSafeTap(elements.deleteProfileButton, (event) => {
+  event.preventDefault();
+  deleteDriverProfile();
 });
 
-elements.onboardingStart?.addEventListener("click", () => {
+addTelegramSafeTap(elements.onboardingStart, (event) => {
+  event.preventDefault();
   onboardingStepIndex = 1;
   renderOnboarding();
 });
 
-elements.onboardingBack?.addEventListener("click", () => {
+addTelegramSafeTap(elements.onboardingBack, (event) => {
+  event.preventDefault();
   readOnboardingInputs();
   onboardingStepIndex = Math.max(0, onboardingStepIndex - 1);
   fillOnboardingInputs();
   renderOnboarding();
 });
 
-elements.onboardingNext?.addEventListener("click", () => {
+addTelegramSafeTap(elements.onboardingNext, (event) => {
+  event.preventDefault();
   nextOnboardingStep();
 });
 
