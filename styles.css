@@ -1276,7 +1276,8 @@ body.telegram-mini-app .side-menu {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.history-view {
+.history-view,
+.archive-view {
   gap: 16px;
 }
 
@@ -1307,6 +1308,49 @@ body.telegram-mini-app .side-menu {
 .history-grid {
   display: grid;
   gap: 14px;
+}
+
+.archive-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.archive-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.archive-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.85fr) minmax(420px, 1.15fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.archive-calendar,
+.archive-shifts {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.archive-subhead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+}
+
+.archive-subhead strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.archive-subhead span {
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .glass-card,
@@ -2125,6 +2169,10 @@ h2 {
 
 .goal-panel p {
   margin-bottom: 0;
+}
+
+.profile-goal-panel {
+  box-shadow: none;
 }
 
 .days-panel {
@@ -3045,7 +3093,8 @@ h2 {
   .hero-grid,
   .content-grid,
   .analytics-grid,
-  .data-grid {
+  .data-grid,
+  .archive-layout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -3165,7 +3214,8 @@ h2 {
   .onboarding-form-grid,
   .data-intro,
   .finish-grid,
-  .form-grid {
+  .form-grid,
+  .archive-layout {
     grid-template-columns: 1fr;
   }
 
@@ -3347,6 +3397,17 @@ h2 {
     align-items: flex-start;
     flex-direction: column;
     gap: 9px;
+  }
+
+  .archive-actions,
+  .archive-subhead {
+    align-items: flex-start;
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .archive-actions .ghost-button {
+    width: 100%;
   }
 
   .section-head .ghost-button {

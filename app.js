@@ -2343,7 +2343,7 @@ function renderMetrics(period) {
   renderExpenses(summary);
   renderGoal(currentWeekSummary());
   renderMiniBars();
-  renderDays(summary);
+  renderDays(periodSummary("all"));
 }
 
 function renderHomeMetrics() {
@@ -2603,7 +2603,7 @@ function dayRecords(period) {
 }
 
 function renderDays(summary) {
-  const records = dayRecords(activePeriod);
+  const records = dayRecords("all");
   elements.daysSummary.textContent = `${summary.shiftsWorked} рабочих · ${summary.daysOff} выходных`;
   elements.daysGrid.innerHTML = records
     .map((record) => {
@@ -3405,7 +3405,7 @@ elements.onboardingChoiceButtons.forEach((button) => {
 });
 
 function setView(view) {
-  const nextView = ["dashboard", "start", "data", "history", "profile"].includes(view) ? view : "home";
+  const nextView = ["dashboard", "start", "archive", "data", "history", "profile"].includes(view) ? view : "home";
   elements.viewButtons.forEach((item) => item.classList.toggle("active", item.dataset.view === nextView));
   elements.viewPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.viewPanel === nextView));
   elements.statsPeriodControls?.classList.toggle("hidden", nextView !== "dashboard");
