@@ -2430,6 +2430,40 @@ function currentWeekSummary() {
   };
 }
 
+function weeklyGoalPace(summary = currentWeekSummary()) {
+  const goal = Math.max(weeklyGoal, 1);
+  const today = new Date();
+  const start = summary.start || weekStart(today);
+  const end = summary.end || addDays(start, 6);
+  const lastElapsedDay = today < end ? today : end;
+  let netTotal = 0;
+  let daysPassed = 0;
+
+  for (let day = new Date(start); day <= lastElapsedDay; day = addDays(day, 1)) {
+    const daily = summaryForDate(dateKey(day));
+    netTotal += Number(daily.net || 0);
+    daysPassed += 1;
+  }
+
+  daysPassed = Math.max(1, Math.min(7, daysPassed));
+  const earned = Math.max(0, netTotal);
+  const averageDailyNet = Math.max(0, netTotal / daysPassed);
+  const forecast = Math.max(0, Math.round(averageDailyNet * 7));
+  const progress = Math.min(100, Math.round((earned / goal) * 100));
+  const rest = Math.max(0, goal - earned);
+
+  return {
+    goal,
+    earned,
+    netTotal,
+    averageDailyNet,
+    forecast,
+    progress,
+    rest,
+    daysPassed,
+  };
+}
+
 function sumExpensesByCategory(source, names) {
   return source.reduce((total, expense) => {
     return names.includes(expense.category) ? total + Number(expense.amount || 0) : total;
@@ -2544,19 +2578,14 @@ function renderHomeMetrics() {
   const todaySummary = summaryForDate(today);
   const yesterdaySummary = summaryForDate(yesterday);
   const week = currentWeekSummary();
-  const daysPassed = Math.max(1, Math.min(7, Math.floor((new Date(`${today}T12:00`) - week.start) / 86400000) + 1));
-  const weekGoalValue = Math.max(weeklyGoal, 1);
-  const weekNet = Math.max(0, week.net);
-  const weekProgress = Math.min(100, Math.round((weekNet / weekGoalValue) * 100));
-  const weeklyRest = Math.max(0, weekGoalValue - weekNet);
-  const forecast = Math.max(0, Math.round((weekNet / daysPassed) * 7));
+  const goalPace = weeklyGoalPace(week);
   const todayDifference = todaySummary.gross - yesterdaySummary.gross;
   const averageHourGross = week.hours ? week.gross / week.hours : 0;
   const averageOrderGross = week.orders ? week.gross / week.orders : 0;
   const cleanKmPrice = week.cleanKmPrice || 0;
   const emptyMileageShare = week.actualKm ? Math.round((week.extraKm / week.actualKm) * 100) : 0;
   const qualityOk = cleanKmPrice >= 25;
-  const paceLabel = forecast >= weekGoalValue ? "выше плана" : "ниже плана";
+  const paceLabel = goalPace.forecast >= goalPace.goal ? "выше плана" : "ниже плана";
 
   elements.homeNetProfit.textContent = money(todaySummary.gross);
   elements.homeProfitFormula.textContent = yesterdaySummary.gross || todaySummary.gross
@@ -2565,16 +2594,16 @@ function renderHomeMetrics() {
   elements.homeProfitDelta.textContent = signedMoney(todayDifference);
   elements.homeProfitDelta.className = todayDifference >= 0 ? "profit" : "loss";
   elements.homeTodayNetValue.textContent = money(todaySummary.net);
-  elements.homeWeeklyGoalLeft.textContent = money(weeklyRest);
+  elements.homeWeeklyGoalLeft.textContent = money(goalPace.rest);
 
-  elements.homeWeekNet.textContent = money(weekNet);
-  elements.homeGoalPercent.textContent = `${weekProgress}%`;
-  elements.homeGoalProgress.style.width = `${weekProgress}%`;
-  elements.homeGoalText.textContent = `выполнено ${weekProgress}% · осталось ${money(weeklyRest)}`;
-  elements.homeForecast.textContent = money(forecast);
+  elements.homeWeekNet.textContent = money(goalPace.earned);
+  elements.homeGoalPercent.textContent = `${goalPace.progress}%`;
+  elements.homeGoalProgress.style.width = `${goalPace.progress}%`;
+  elements.homeGoalText.textContent = `чистыми в день ${money(goalPace.averageDailyNet)} · осталось ${money(goalPace.rest)}`;
+  elements.homeForecast.textContent = money(goalPace.forecast);
   elements.homePaceLabel.textContent = paceLabel;
-  elements.homePaceLabel.className = forecast >= weekGoalValue ? "profit" : "loss";
-  elements.homeForecastText.textContent = `если продолжишь в таком темпе → ${money(forecast)} за неделю`;
+  elements.homePaceLabel.className = goalPace.forecast >= goalPace.goal ? "profit" : "loss";
+  elements.homeForecastText.textContent = `${money(goalPace.averageDailyNet)} чистыми в день → ${money(goalPace.forecast)} за неделю`;
   elements.homeWeekOrders.textContent = new Intl.NumberFormat("uk-UA").format(week.orders);
   elements.homeWeekHours.textContent = `${Number(week.hours.toFixed(1))} ч`;
   elements.homeWeekOps.textContent = `${Number(week.km.toFixed(1))} км · ${week.shiftsWorked} рабочих дней`;
@@ -2695,22 +2724,15 @@ function renderExpenses(summary) {
 }
 
 function renderGoal(summary) {
-  const goal = Math.max(weeklyGoal, 1);
-  const weekNet = Math.max(0, summary.net);
-  const progress = Math.min(100, Math.round((weekNet / goal) * 100));
-  const rest = Math.max(0, goal - weekNet);
-  const today = new Date();
-  const start = weekStart(today);
-  const daysPassed = Math.max(1, Math.min(7, Math.floor((new Date(`${dateKey(today)}T12:00`) - start) / 86400000) + 1));
-  const forecast = Math.max(0, Math.round((weekNet / daysPassed) * 7));
+  const goalPace = weeklyGoalPace(summary);
 
   if (elements.goalInput) elements.goalInput.value = String(weeklyGoal);
-  elements.goalPercent.textContent = `${progress}%`;
-  elements.goalProgress.style.width = `${progress}%`;
-  if (elements.goalProgressSecondary) elements.goalProgressSecondary.style.width = `${progress}%`;
-  elements.goalText.textContent = rest
-    ? `Осталось ${money(rest)}. Если продолжишь в таком темпе → ${money(forecast)} за неделю.`
-    : `Цель недели закрыта. Прогноз при текущем темпе → ${money(forecast)}.`;
+  elements.goalPercent.textContent = `${goalPace.progress}%`;
+  elements.goalProgress.style.width = `${goalPace.progress}%`;
+  if (elements.goalProgressSecondary) elements.goalProgressSecondary.style.width = `${goalPace.progress}%`;
+  elements.goalText.textContent = goalPace.rest
+    ? `Осталось ${money(goalPace.rest)}. Сейчас ${money(goalPace.averageDailyNet)} чистыми в день → прогноз ${money(goalPace.forecast)} за неделю.`
+    : `Цель недели закрыта. Средняя чистая прибыль ${money(goalPace.averageDailyNet)} в день → прогноз ${money(goalPace.forecast)}.`;
 }
 
 function dateKey(value) {
