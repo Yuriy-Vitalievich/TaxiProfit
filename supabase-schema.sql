@@ -162,6 +162,54 @@ as $$
     and target_telegram_id = public.current_telegram_id()
 $$;
 
+create or replace function public.clear_current_telegram_activity()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  tg bigint := public.current_telegram_id();
+  uid uuid := auth.uid();
+begin
+  delete from public.shifts
+  where (uid is not null and user_id = uid)
+     or (tg is not null and telegram_id = tg);
+
+  delete from public.expenses
+  where (uid is not null and user_id = uid)
+     or (tg is not null and telegram_id = tg);
+end;
+$$;
+
+create or replace function public.delete_current_telegram_profile_data()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  tg bigint := public.current_telegram_id();
+  uid uuid := auth.uid();
+begin
+  delete from public.settings
+  where (uid is not null and user_id = uid)
+     or (tg is not null and telegram_id = tg);
+
+  delete from public.shifts
+  where (uid is not null and user_id = uid)
+     or (tg is not null and telegram_id = tg);
+
+  delete from public.expenses
+  where (uid is not null and user_id = uid)
+     or (tg is not null and telegram_id = tg);
+
+  delete from public.profiles
+  where (uid is not null and user_id = uid)
+     or (tg is not null and telegram_id = tg);
+end;
+$$;
+
 alter table public.shifts replica identity full;
 alter table public.expenses replica identity full;
 alter table public.settings replica identity full;
