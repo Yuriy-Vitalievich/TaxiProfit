@@ -1731,7 +1731,8 @@ async function deleteCloudRow(table, remoteId) {
 }
 
 async function replaceCloudTable(table, items) {
-  if (!hasCloudStorage() || !requireCloudUser()) return;
+  if (!hasCloudStorage()) return true;
+  if (!requireCloudUser()) return false;
 
   try {
     const ownerQuery = cloudOwnerQuery();
@@ -1742,7 +1743,7 @@ async function replaceCloudTable(table, items) {
       prefer: "return=minimal",
     });
 
-    if (!items.length) return;
+    if (!items.length) return true;
 
     const data = await cloudRequest(table, {
       method: "POST",
@@ -1752,8 +1753,10 @@ async function replaceCloudTable(table, items) {
     data.forEach((row, index) => {
       items[index].remoteId = row.id;
     });
+    return true;
   } catch (error) {
     console.warn(`Could not replace ${table} data in Supabase.`, error);
+    return false;
   }
 }
 
@@ -4017,15 +4020,30 @@ elements.cancelExpenseEdit.addEventListener("click", () => {
 });
 
 elements.clearData.addEventListener("click", async () => {
+  const shouldClear = window.confirm(
+    "Точно удалить все смены и расходы? Данные будут удалены из приложения и Supabase для текущего пользователя.",
+  );
+  if (!shouldClear) return;
+
+  const [shiftsCleared, expensesCleared] = await Promise.all([
+    replaceCloudTable("shifts", []),
+    replaceCloudTable("expenses", []),
+  ]);
+
+  if (!shiftsCleared || !expensesCleared) {
+    setSyncStatus("Не удалось очистить Supabase. Данные оставлены на месте, чтобы они не вернулись после перезагрузки.");
+    return;
+  }
+
   shifts = [];
   expenses = [];
   selectedDay = dateKey(new Date());
   if (elements.dayPicker) elements.dayPicker.value = selectedDay;
   resetShiftForm();
   resetExpenseForm();
-  await Promise.all([replaceCloudTable("shifts", shifts), replaceCloudTable("expenses", expenses)]);
   saveShifts();
   saveExpenses();
+  setSyncStatus("Данные удалены из приложения и Supabase.");
   renderAll();
 });
 
