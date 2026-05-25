@@ -259,6 +259,12 @@ to authenticated
 using (user_id = auth.uid() or telegram_id = public.current_telegram_id())
 with check (user_id = auth.uid() or telegram_id = public.current_telegram_id());
 
+drop policy if exists "Users delete own profile" on public.profiles;
+create policy "Users delete own profile"
+on public.profiles for delete
+to authenticated
+using (user_id = auth.uid() or telegram_id = public.current_telegram_id());
+
 drop policy if exists "Public read shifts" on public.shifts;
 drop policy if exists "Users read own shifts" on public.shifts;
 create policy "Users read own shifts"
