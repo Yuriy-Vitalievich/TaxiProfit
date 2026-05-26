@@ -210,6 +210,117 @@ begin
 end;
 $$;
 
+create or replace function public.upsert_current_telegram_profile(profile_payload jsonb)
+returns public.profiles
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  tg bigint := public.current_telegram_id();
+  uid uuid := auth.uid();
+  target_user_id uuid;
+  saved public.profiles;
+begin
+  if uid is null then
+    raise exception 'auth.uid is required';
+  end if;
+
+  select p.user_id
+  into target_user_id
+  from public.profiles p
+  where p.user_id = uid
+     or (tg is not null and p.telegram_id = tg)
+  order by
+    case when p.user_id = uid then 0 else 1 end,
+    p.onboarding_completed desc,
+    p.updated_at desc
+  limit 1;
+
+  if target_user_id is null then
+    target_user_id := uid;
+  end if;
+
+  insert into public.profiles (
+    user_id,
+    telegram_id,
+    telegram_username,
+    display_name,
+    driver_name,
+    car_ownership,
+    car_brand,
+    car_model,
+    car_year,
+    fuel_type,
+    fuel_consumption,
+    odometer,
+    car_number,
+    default_platform,
+    rent_amount,
+    rent_frequency,
+    rent_payment_day,
+    platforms,
+    phone,
+    city,
+    avatar_url,
+    weekly_goal,
+    onboarding_completed
+  )
+  values (
+    target_user_id,
+    coalesce(tg, nullif(profile_payload ->> 'telegram_id', '')::bigint),
+    coalesce(profile_payload ->> 'telegram_username', ''),
+    coalesce(profile_payload ->> 'display_name', ''),
+    coalesce(profile_payload ->> 'driver_name', ''),
+    coalesce(profile_payload ->> 'car_ownership', ''),
+    coalesce(profile_payload ->> 'car_brand', ''),
+    coalesce(profile_payload ->> 'car_model', ''),
+    nullif(profile_payload ->> 'car_year', '')::integer,
+    coalesce(profile_payload ->> 'fuel_type', ''),
+    nullif(profile_payload ->> 'fuel_consumption', '')::numeric,
+    nullif(profile_payload ->> 'odometer', '')::numeric,
+    coalesce(profile_payload ->> 'car_number', ''),
+    coalesce(profile_payload ->> 'default_platform', 'Bolt'),
+    nullif(profile_payload ->> 'rent_amount', '')::numeric,
+    coalesce(profile_payload ->> 'rent_frequency', ''),
+    coalesce(profile_payload ->> 'rent_payment_day', ''),
+    coalesce(profile_payload -> 'platforms', '[]'::jsonb),
+    coalesce(profile_payload ->> 'phone', ''),
+    coalesce(profile_payload ->> 'city', ''),
+    coalesce(profile_payload ->> 'avatar_url', ''),
+    coalesce(nullif(profile_payload ->> 'weekly_goal', '')::numeric, 10000),
+    coalesce((profile_payload ->> 'onboarding_completed')::boolean, false)
+  )
+  on conflict (user_id) do update
+  set
+    telegram_id = excluded.telegram_id,
+    telegram_username = excluded.telegram_username,
+    display_name = excluded.display_name,
+    driver_name = excluded.driver_name,
+    car_ownership = excluded.car_ownership,
+    car_brand = excluded.car_brand,
+    car_model = excluded.car_model,
+    car_year = excluded.car_year,
+    fuel_type = excluded.fuel_type,
+    fuel_consumption = excluded.fuel_consumption,
+    odometer = excluded.odometer,
+    car_number = excluded.car_number,
+    default_platform = excluded.default_platform,
+    rent_amount = excluded.rent_amount,
+    rent_frequency = excluded.rent_frequency,
+    rent_payment_day = excluded.rent_payment_day,
+    platforms = excluded.platforms,
+    phone = excluded.phone,
+    city = excluded.city,
+    avatar_url = excluded.avatar_url,
+    weekly_goal = excluded.weekly_goal,
+    onboarding_completed = excluded.onboarding_completed
+  returning * into saved;
+
+  return saved;
+end;
+$$;
+
 alter table public.shifts replica identity full;
 alter table public.expenses replica identity full;
 alter table public.settings replica identity full;
