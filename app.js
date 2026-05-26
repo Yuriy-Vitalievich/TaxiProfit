@@ -3734,16 +3734,15 @@ function addTelegramSafeTap(element, handler) {
     const now = Date.now();
     if (now - lastRun < 320) {
       event.preventDefault();
+      event.stopPropagation();
       return;
     }
     lastRun = now;
+    event.stopPropagation();
     handler(event);
   };
   element.addEventListener("click", run);
-  element.addEventListener("pointerup", (event) => {
-    if (event.pointerType === "mouse") return;
-    run(event);
-  });
+  element.addEventListener("touchend", run, { passive: false });
 }
 
 async function submitProfileForm() {
