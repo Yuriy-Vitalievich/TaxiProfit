@@ -915,7 +915,7 @@ function getTelegramId() {
 }
 
 function getCloudOwnerUserId() {
-  return userProfile.userId || getCurrentUserId();
+  return getCurrentUserId() || userProfile.userId || null;
 }
 
 function getCloudOwnerTelegramId() {
@@ -1161,14 +1161,28 @@ async function ensureUserProfile() {
 
   try {
     const telegramId = getTelegramId();
-    const filters = [`user_id.eq.${encodeURIComponent(getCurrentUserId())}`];
-    if (telegramId) filters.push(`telegram_id.eq.${encodeURIComponent(telegramId)}`);
-    const [row] = await cloudRequest("profiles", {
-      query: `?or=(${filters.join(",")})&select=*&order=onboarding_completed.desc&limit=1`,
+    const [currentUserRow] = await cloudRequest("profiles", {
+      query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&select=*&limit=1`,
     });
+    let telegramRow = null;
+
+    if (telegramId) {
+      [telegramRow] = await cloudRequest("profiles", {
+        query: `?telegram_id=eq.${encodeURIComponent(telegramId)}&select=*&order=updated_at.desc&limit=1`,
+      });
+    }
+
+    let row = currentUserRow;
+    if (!currentUserRow?.onboarding_completed && telegramRow?.onboarding_completed) {
+      row = telegramRow;
+    }
+    if (!row && telegramRow) row = telegramRow;
 
     if (row) {
       saveLocalProfile(profileFromSupabase(row));
+      if (row !== currentUserRow && row.onboarding_completed) {
+        await saveUserProfile({ ...userProfile, userId: getCurrentUserId(), onboardingCompleted: true });
+      }
       if (userProfile.defaultPlatform) selectedRunnerPlatform = userProfile.defaultPlatform;
       if (Number(userProfile.weeklyGoal) > 0) saveWeeklyGoal(Number(userProfile.weeklyGoal));
       renderProfile();
@@ -1208,14 +1222,15 @@ async function saveUserProfile(profile) {
   }
 
   try {
-    const ownerUserId = getCloudOwnerUserId();
+    const ownerUserId = getCurrentUserId();
     const payload = profileToSupabasePayload(profile);
     try {
       const savedProfile = await cloudRequest("rpc/upsert_current_telegram_profile", {
         method: "POST",
         body: { profile_payload: payload },
       });
-      if (savedProfile) saveLocalProfile(profileFromSupabase(savedProfile));
+      const savedProfileRow = Array.isArray(savedProfile) ? savedProfile[0] : savedProfile;
+      if (savedProfileRow) saveLocalProfile(profileFromSupabase(savedProfileRow));
       renderProfile("Профиль сохранен в Supabase.");
       renderOnboarding();
       return true;
