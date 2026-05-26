@@ -362,20 +362,55 @@ function saveWeeklyGoal(value) {
   writeStorage(String(weeklyGoal), GOAL_STORAGE_KEY);
 }
 
+function profileNumber(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined || value === "") continue;
+    const parsed = Number(String(value).replace(",", "."));
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return "";
+}
+
+function normalizeProfile(profile = {}) {
+  return {
+    ...profile,
+    userId: profile.userId || profile.user_id || "",
+    telegramId: profile.telegramId || profile.telegram_id || "",
+    telegramUsername: profile.telegramUsername || profile.telegram_username || "",
+    displayName: profile.displayName || profile.display_name || "",
+    driverName: profile.driverName || profile.driver_name || "",
+    carOwnership: profile.carOwnership || profile.car_ownership || "",
+    carBrand: profile.carBrand || profile.car_brand || "",
+    carModel: profile.carModel || profile.car_model || "",
+    carYear: profileNumber(profile.carYear, profile.car_year),
+    fuelType: profile.fuelType || profile.fuel_type || "",
+    fuelConsumption: profileNumber(profile.fuelConsumption, profile.fuel_consumption),
+    odometer: profileNumber(profile.odometer),
+    carNumber: profile.carNumber || profile.car_number || "",
+    defaultPlatform: profile.defaultPlatform || profile.default_platform || "Bolt",
+    rentAmount: profileNumber(profile.rentAmount, profile.rent_amount),
+    rentFrequency: profile.rentFrequency || profile.rent_frequency || "",
+    rentPaymentDay: profile.rentPaymentDay || profile.rent_payment_day || "",
+    avatarUrl: profile.avatarUrl || profile.avatar_url || "",
+    weeklyGoal: profileNumber(profile.weeklyGoal, profile.weekly_goal, weeklyGoal, DEFAULT_WEEKLY_GOAL),
+    onboardingCompleted: Boolean(profile.onboardingCompleted ?? profile.onboarding_completed),
+  };
+}
+
 function loadLocalProfile() {
   const saved = readStorage(PROFILE_STORAGE_KEY);
   if (!saved) return {};
 
   try {
     const parsed = JSON.parse(saved);
-    return parsed && typeof parsed === "object" ? parsed : {};
+    return parsed && typeof parsed === "object" ? normalizeProfile(parsed) : {};
   } catch {
     return {};
   }
 }
 
 function saveLocalProfile(profile) {
-  userProfile = { ...userProfile, ...(profile || {}) };
+  userProfile = normalizeProfile({ ...userProfile, ...(profile || {}) });
   writeStorage(JSON.stringify(userProfile), PROFILE_STORAGE_KEY);
 }
 
@@ -1092,7 +1127,7 @@ async function signInAnonymously() {
 }
 
 function profileFromSupabase(row = {}) {
-  return {
+  return normalizeProfile({
     userId: row.user_id || getCurrentUserId() || "",
     telegramId: row.telegram_id || "",
     telegramUsername: row.telegram_username || "",
@@ -1103,8 +1138,8 @@ function profileFromSupabase(row = {}) {
     carModel: row.car_model || "",
     carYear: row.car_year || "",
     fuelType: row.fuel_type || "",
-    fuelConsumption: row.fuel_consumption || "",
-    odometer: row.odometer || "",
+    fuelConsumption: row.fuel_consumption,
+    odometer: row.odometer,
     carNumber: row.car_number || "",
     defaultPlatform: row.default_platform || "Bolt",
     rentAmount: row.rent_amount || "",
@@ -1116,7 +1151,7 @@ function profileFromSupabase(row = {}) {
     avatarUrl: row.avatar_url || "",
     weeklyGoal: Number(row.weekly_goal || weeklyGoal || DEFAULT_WEEKLY_GOAL),
     onboardingCompleted: Boolean(row.onboarding_completed),
-  };
+  });
 }
 
 function profileToSupabasePayload(profile = userProfile) {
@@ -1400,10 +1435,11 @@ function renderProfile(message = "") {
     elements.profileRegisteredStatus.classList.toggle("muted", !registered);
   }
   if (elements.profileOdometerLabel) {
-    elements.profileOdometerLabel.textContent = latestOdometer ? `${formatNumber(Number(latestOdometer.toFixed(1)))} км` : "— км";
+    elements.profileOdometerLabel.textContent = latestOdometer > 0 ? `${formatNumber(Number(latestOdometer.toFixed(1)))} км` : "— км";
   }
   if (elements.profileFuelLabel) {
-    elements.profileFuelLabel.textContent = profile.fuelConsumption ? `${formatNumber(profile.fuelConsumption)} л/100 км` : "— л/100 км";
+    const fuelConsumption = profileNumber(profile.fuelConsumption);
+    elements.profileFuelLabel.textContent = fuelConsumption > 0 ? `${formatNumber(fuelConsumption)} л/100 км` : "— л/100 км";
   }
   if (elements.profileSessionLabel) {
     const telegramId = telegram.telegram_id || profile.telegramId || "";
