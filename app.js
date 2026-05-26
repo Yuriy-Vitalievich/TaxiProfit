@@ -594,18 +594,6 @@ function setupTelegramMiniApp() {
 }
 
 function preventAccidentalZoom() {
-  let lastTouchEnd = 0;
-
-  document.addEventListener(
-    "touchend",
-    (event) => {
-      const now = Date.now();
-      if (now - lastTouchEnd <= 320) event.preventDefault();
-      lastTouchEnd = now;
-    },
-    { passive: false },
-  );
-
   document.addEventListener(
     "gesturestart",
     (event) => {
@@ -3727,22 +3715,19 @@ elements.signOutButton?.addEventListener("click", async () => {
   setSyncStatus("Вход отключен: работаем с локальной копией.");
 });
 
-function addTelegramSafeTap(element, handler) {
+function bindActionButton(element, handler) {
   if (!element) return;
   let lastRun = 0;
   const run = (event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
     const now = Date.now();
-    if (now - lastRun < 320) {
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
+    if (now - lastRun < 260) return;
     lastRun = now;
-    event.stopPropagation();
     handler(event);
   };
-  element.addEventListener("click", run);
-  element.addEventListener("touchend", run, { passive: false });
+  element.onclick = run;
+  element.ontouchend = run;
 }
 
 async function submitProfileForm() {
@@ -3759,20 +3744,17 @@ elements.profileForm?.addEventListener("submit", async (event) => {
   await submitProfileForm();
 });
 
-addTelegramSafeTap(elements.saveProfileButton, (event) => {
-  event.preventDefault();
+bindActionButton(elements.saveProfileButton, () => {
   submitProfileForm();
 });
 
-addTelegramSafeTap(elements.editProfileButton, (event) => {
-  event.preventDefault();
+bindActionButton(elements.editProfileButton, () => {
   isProfileEditing = !isProfileEditing;
   fillProfileForm();
   renderProfile();
 });
 
-addTelegramSafeTap(elements.cancelProfileEdit, (event) => {
-  event.preventDefault();
+bindActionButton(elements.cancelProfileEdit, () => {
   isProfileEditing = false;
   fillProfileForm();
   renderProfile();
@@ -3798,27 +3780,23 @@ async function deleteDriverProfile() {
   renderAll();
 }
 
-addTelegramSafeTap(elements.deleteProfileButton, (event) => {
-  event.preventDefault();
+bindActionButton(elements.deleteProfileButton, () => {
   deleteDriverProfile();
 });
 
-addTelegramSafeTap(elements.onboardingStart, (event) => {
-  event.preventDefault();
+bindActionButton(elements.onboardingStart, () => {
   onboardingStepIndex = 1;
   renderOnboarding();
 });
 
-addTelegramSafeTap(elements.onboardingBack, (event) => {
-  event.preventDefault();
+bindActionButton(elements.onboardingBack, () => {
   readOnboardingInputs();
   onboardingStepIndex = Math.max(0, onboardingStepIndex - 1);
   fillOnboardingInputs();
   renderOnboarding();
 });
 
-addTelegramSafeTap(elements.onboardingNext, (event) => {
-  event.preventDefault();
+bindActionButton(elements.onboardingNext, () => {
   nextOnboardingStep();
 });
 
