@@ -1210,6 +1210,19 @@ async function saveUserProfile(profile) {
   try {
     const ownerUserId = getCloudOwnerUserId();
     const payload = profileToSupabasePayload(profile);
+    try {
+      const savedProfile = await cloudRequest("rpc/upsert_current_telegram_profile", {
+        method: "POST",
+        body: { profile_payload: payload },
+      });
+      if (savedProfile) saveLocalProfile(profileFromSupabase(savedProfile));
+      renderProfile("Профиль сохранен в Supabase.");
+      renderOnboarding();
+      return true;
+    } catch (rpcError) {
+      console.warn("Profile RPC save unavailable, using REST fallback.", rpcError);
+    }
+
     const updated = await cloudRequest("profiles", {
       method: "PATCH",
       query: `?user_id=eq.${encodeURIComponent(ownerUserId)}`,
@@ -1537,9 +1550,6 @@ function fillOnboardingInputs() {
 }
 
 function validateOnboardingStep() {
-  const step = currentOnboardingStep();
-  if (step === "carType" && !onboardingDraft.carOwnership) return "Выбери тип авто.";
-  if (step === "platforms" && !(onboardingDraft.platforms || []).length) return "Выбери хотя бы один агрегатор.";
   return "";
 }
 
@@ -1549,6 +1559,7 @@ async function finishOnboarding() {
   const nextProfile = {
     ...userProfile,
     ...onboardingDraft,
+    carOwnership: onboardingDraft.carOwnership || userProfile.carOwnership || "own",
     driverName: onboardingDraft.driverName || userProfile.driverName || telegramDisplayName() || "",
     displayName: userProfile.displayName || telegramDisplayName() || onboardingDraft.driverName || "",
     platforms,
@@ -1570,6 +1581,10 @@ async function finishOnboarding() {
 
 function nextOnboardingStep() {
   readOnboardingInputs();
+  if (currentOnboardingStep() === "carType" && !onboardingDraft.carOwnership) {
+    onboardingDraft.carOwnership = "own";
+    saveOnboardingDraft();
+  }
   const validationMessage = validateOnboardingStep();
   if (validationMessage) {
     if (elements.profileSaveStatus) elements.profileSaveStatus.textContent = validationMessage;
