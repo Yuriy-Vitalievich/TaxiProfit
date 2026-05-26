@@ -3675,19 +3675,19 @@ elements.runnerPlatformButtons.forEach((button) => {
   });
 });
 
-elements.startShiftButton?.addEventListener("click", () => {
+bindActionButton(elements.startShiftButton, () => {
   startRunnerShift();
 });
 
-elements.finishShiftButton?.addEventListener("click", () => {
+bindActionButton(elements.finishShiftButton, () => {
   finishRunnerShift();
 });
 
-elements.cancelActiveShiftButton?.addEventListener("click", () => {
+bindActionButton(elements.cancelActiveShiftButton, () => {
   cancelActiveRunnerShift();
 });
 
-elements.cancelFinishShift?.addEventListener("click", () => {
+bindActionButton(elements.cancelFinishShift, () => {
   pendingShiftFinish = null;
   renderShiftRunner();
 });
@@ -3748,16 +3748,25 @@ elements.signOutButton?.addEventListener("click", async () => {
 function bindActionButton(element, handler) {
   if (!element) return;
   let lastRun = 0;
-  const run = (event) => {
+  const run = async (event) => {
     event?.preventDefault?.();
     event?.stopPropagation?.();
     const now = Date.now();
-    if (now - lastRun < 260) return;
+    if (now - lastRun < 360) return;
     lastRun = now;
-    handler(event);
+    try {
+      await handler(event);
+    } catch (error) {
+      console.error("Action button failed.", error);
+      const message = "Действие не выполнено. Проверь Supabase и попробуй еще раз.";
+      if (elements.profileSaveStatus) elements.profileSaveStatus.textContent = message;
+      if (elements.authMessage) elements.authMessage.textContent = message;
+      setSyncStatus(message);
+    }
   };
-  element.onclick = run;
-  element.ontouchend = run;
+  element.addEventListener("click", run);
+  element.addEventListener("pointerup", run);
+  element.addEventListener("touchend", run, { passive: false });
 }
 
 async function submitProfileForm() {
