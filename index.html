@@ -10,11 +10,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="TaxiProfit - мобильный cockpit для учета смен, расходов и прибыли водителя такси." />
     <title>TaxiProfit</title>
-    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260527-3" />
+    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260527-4" />
     <link rel="icon" href="assets/icons/taxiprofit-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/icons/taxiprofit-icon.svg" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=telegram-20260527-3" />
+    <link rel="stylesheet" href="styles.css?v=telegram-20260527-4" />
   </head>
   <body>
     <section class="onboarding-overlay" id="onboardingOverlay" hidden aria-label="Регистрация водителя">
@@ -787,11 +787,10 @@
           <article class="profile-summary-card" id="profileSummaryCard">
             <div class="profile-summary-head">
               <div>
-                <span class="profile-card-label">Зарегистрирован</span>
+                <span class="profile-card-label">Аккаунт зарегистрирован</span>
                 <strong id="profileDriverLabel">Водитель</strong>
                 <p id="profileCarLabel">Авто не указано</p>
               </div>
-              <span class="profile-status-pill" id="profileRegisteredStatus">Профиль активен</span>
             </div>
             <div class="profile-facts-grid">
               <div>
@@ -864,7 +863,7 @@
           <div class="profile-grid profile-system-grid">
             <article class="profile-card auth-card compact-profile-card">
               <span class="profile-card-label">Аккаунт</span>
-              <strong id="authStatusTitle">Профиль подключен</strong>
+              <strong id="authStatusTitle">Синхронизация включена</strong>
               <p id="authStatusText">Данные сохраняются в Supabase и синхронизируются между устройствами.</p>
             </article>
 
@@ -895,6 +894,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=telegram-20260527-3"></script>
+    <script src="app.js?v=telegram-20260527-4"></script>
   </body>
 </html>

@@ -225,7 +225,6 @@ const elements = {
   deleteProfileButton: document.querySelector("#deleteProfileButton"),
   saveProfileButton: document.querySelector("#saveProfileButton"),
   profileSummaryCard: document.querySelector("#profileSummaryCard"),
-  profileRegisteredStatus: document.querySelector("#profileRegisteredStatus"),
   profileOdometerLabel: document.querySelector("#profileOdometerLabel"),
   profileFuelLabel: document.querySelector("#profileFuelLabel"),
   profileSessionLabel: document.querySelector("#profileSessionLabel"),
@@ -1429,11 +1428,6 @@ function renderProfile(message = "") {
     elements.profileCarLabel.textContent = carTitle || "Авто не указано";
   }
   const latestOdometer = latestKnownOdometer();
-  const registered = Boolean(profile.userId || profile.onboardingCompleted || profile.driverName || profile.carBrand);
-  if (elements.profileRegisteredStatus) {
-    elements.profileRegisteredStatus.textContent = registered ? "Профиль зарегистрирован" : "Профиль не заполнен";
-    elements.profileRegisteredStatus.classList.toggle("muted", !registered);
-  }
   if (elements.profileOdometerLabel) {
     elements.profileOdometerLabel.textContent = latestOdometer > 0 ? `${formatNumber(Number(latestOdometer.toFixed(1)))} км` : "— км";
   }
@@ -1457,12 +1451,12 @@ function renderProfile(message = "") {
     const hasDriverProfile = Boolean(profile.userId || profile.onboardingCompleted);
     elements.authStatusTitle.textContent = currentUser
       ? currentUser.is_anonymous
-        ? "Профиль подключен"
-        : "Аккаунт подключен"
+        ? "Синхронизация включена"
+        : "Supabase подключен"
       : hasDriverProfile
-        ? "Профиль подключен"
+        ? "Локальный профиль"
       : authReady
-        ? "Вход не выполнен"
+        ? "Сессия не активна"
         : "Проверяем вход...";
   }
   if (elements.authStatusText) {
