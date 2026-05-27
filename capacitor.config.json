@@ -1,7 +1,7 @@
 {
   "appId": "app.taxiprofit.driver",
   "appName": "TaxiProfit",
-  "webDir": ".",
+  "webDir": "www",
   "server": {
     "androidScheme": "https"
   },
