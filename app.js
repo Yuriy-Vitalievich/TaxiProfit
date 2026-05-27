@@ -112,6 +112,8 @@ const elements = {
   finishShiftForm: document.querySelector("#finishShiftForm"),
   cancelFinishShift: document.querySelector("#cancelFinishShift"),
   startOdometer: document.querySelector("#startOdometer"),
+  startFuelLeft: document.querySelector("#startFuelLeft"),
+  startFuelHint: document.querySelector("#startFuelHint"),
   activePlatform: document.querySelector("#activePlatform"),
   activeTimer: document.querySelector("#activeTimer"),
   activeShiftMeta: document.querySelector("#activeShiftMeta"),
@@ -122,6 +124,9 @@ const elements = {
   homeProfitDelta: document.querySelector("#homeProfitDelta"),
   homeTodayNetValue: document.querySelector("#homeTodayNetValue"),
   homeWeeklyGoalLeft: document.querySelector("#homeWeeklyGoalLeft"),
+  homeFuelToday: document.querySelector("#homeFuelToday"),
+  homeRealMileage: document.querySelector("#homeRealMileage"),
+  homeIdleMileage: document.querySelector("#homeIdleMileage"),
   homeWeekNet: document.querySelector("#homeWeekNet"),
   homeGoalPercent: document.querySelector("#homeGoalPercent"),
   homeGoalProgress: document.querySelector("#homeGoalProgress"),
@@ -138,6 +143,7 @@ const elements = {
   homeWeekCleanText: document.querySelector("#homeWeekCleanText"),
   homeOpsText: document.querySelector("#homeOpsText"),
   homeKmPriceText: document.querySelector("#homeKmPriceText"),
+  homeFuelRangeText: document.querySelector("#homeFuelRangeText"),
   homeMiniBars: document.querySelector("#homeMiniBars"),
   homeMiniStartLabel: document.querySelector("#homeMiniStartLabel"),
   homeMiniEndLabel: document.querySelector("#homeMiniEndLabel"),
@@ -173,6 +179,15 @@ const elements = {
   fineExpense: document.querySelector("#fineExpense"),
   repairExpense: document.querySelector("#repairExpense"),
   otherExpense: document.querySelector("#otherExpense"),
+  idleMileageBadge: document.querySelector("#idleMileageBadge"),
+  effTotalMileage: document.querySelector("#effTotalMileage"),
+  effOrderMileage: document.querySelector("#effOrderMileage"),
+  effIdleMileage: document.querySelector("#effIdleMileage"),
+  effIdleCost: document.querySelector("#effIdleCost"),
+  effNetKm: document.querySelector("#effNetKm"),
+  effRevenueKm: document.querySelector("#effRevenueKm"),
+  effFuelUsed: document.querySelector("#effFuelUsed"),
+  effFuelCost: document.querySelector("#effFuelCost"),
   syncStatus: document.querySelector("#syncStatus"),
   goalInput: document.querySelector("#goalInput"),
   goalPercent: document.querySelector("#goalPercent"),
@@ -385,6 +400,9 @@ function normalizeProfile(profile = {}) {
     fuelType: profile.fuelType || profile.fuel_type || "",
     fuelConsumption: profileNumber(profile.fuelConsumption, profile.fuel_consumption),
     odometer: profileNumber(profile.odometer),
+    fuelTankCapacity: profileNumber(profile.fuelTankCapacity, profile.fuel_tank_capacity),
+    fuelPrice: profileNumber(profile.fuelPrice, profile.fuel_price),
+    fuelLeft: profileNumber(profile.fuelLeft, profile.current_fuel_left, profile.fuel_left),
     carNumber: profile.carNumber || profile.car_number || "",
     defaultPlatform: profile.defaultPlatform || profile.default_platform || "Bolt",
     rentAmount: profileNumber(profile.rentAmount, profile.rent_amount),
@@ -1139,6 +1157,9 @@ function profileFromSupabase(row = {}) {
     fuelType: row.fuel_type || "",
     fuelConsumption: row.fuel_consumption,
     odometer: row.odometer,
+    fuelTankCapacity: row.fuel_tank_capacity,
+    fuelPrice: row.fuel_price,
+    fuelLeft: row.current_fuel_left,
     carNumber: row.car_number || "",
     defaultPlatform: row.default_platform || "Bolt",
     rentAmount: row.rent_amount || "",
@@ -1168,6 +1189,9 @@ function profileToSupabasePayload(profile = userProfile) {
     fuel_type: profile.fuelType || "",
     fuel_consumption: Number(profile.fuelConsumption || 0) || null,
     odometer: Number(profile.odometer || 0) || null,
+    fuel_tank_capacity: Number(profile.fuelTankCapacity || 0) || null,
+    fuel_price: Number(profile.fuelPrice || 0) || null,
+    current_fuel_left: Number(profile.fuelLeft || 0) || null,
     car_number: profile.carNumber || "",
     default_platform: profile.defaultPlatform || selectedRunnerPlatform || "Bolt",
     rent_amount: Number(profile.rentAmount || 0) || null,
@@ -1320,6 +1344,9 @@ async function deleteCloudProfile() {
       fuel_type: "",
       fuel_consumption: null,
       odometer: null,
+      fuel_tank_capacity: null,
+      fuel_price: null,
+      current_fuel_left: null,
       car_number: "",
       default_platform: "",
       rent_amount: null,
@@ -1387,6 +1414,10 @@ function readProfileForm() {
     carModel: String(data.get("carModel") || "").trim(),
     odometer: Number(data.get("odometer") || 0) || "",
     fuelConsumption: Number(data.get("fuelConsumption") || 0) || "",
+    fuelType: String(data.get("fuelType") || userProfile.fuelType || "Бензин"),
+    fuelTankCapacity: Number(data.get("fuelTankCapacity") || 0) || "",
+    fuelPrice: Number(data.get("fuelPrice") || 0) || "",
+    fuelLeft: Number(data.get("fuelLeft") || 0) || "",
     weeklyGoal: Number(data.get("weeklyGoal") || weeklyGoal || DEFAULT_WEEKLY_GOAL),
   };
 }
@@ -1399,6 +1430,10 @@ function fillProfileForm() {
   elements.profileForm.elements.carModel.value = profile.carModel || "";
   elements.profileForm.elements.odometer.value = profile.odometer || "";
   elements.profileForm.elements.fuelConsumption.value = profile.fuelConsumption || "";
+  if (elements.profileForm.elements.fuelType) elements.profileForm.elements.fuelType.value = profile.fuelType || "Бензин";
+  if (elements.profileForm.elements.fuelTankCapacity) elements.profileForm.elements.fuelTankCapacity.value = profile.fuelTankCapacity || "";
+  if (elements.profileForm.elements.fuelPrice) elements.profileForm.elements.fuelPrice.value = profile.fuelPrice || "";
+  if (elements.profileForm.elements.fuelLeft) elements.profileForm.elements.fuelLeft.value = profile.fuelLeft || "";
   elements.profileForm.elements.weeklyGoal.value = Number(profile.weeklyGoal || weeklyGoal || DEFAULT_WEEKLY_GOAL);
 }
 
@@ -1577,6 +1612,9 @@ function readOnboardingInputs() {
     fuelType: textValue("fuelType") || "Бензин",
     fuelConsumption: numberValue("fuelConsumption"),
     odometer: numberValue("odometer"),
+    fuelTankCapacity: numberValue("fuelTankCapacity"),
+    fuelPrice: numberValue("fuelPrice"),
+    fuelLeft: numberValue("fuelLeft"),
     rentAmount: numberValue("rentAmount"),
     rentFrequency: textValue("rentFrequency"),
     rentPaymentDay: textValue("rentPaymentDay"),
@@ -1588,7 +1626,7 @@ function fillOnboardingInputs() {
   const root = elements.onboardingOverlay;
   if (!root) return;
   const source = { ...userProfile, ...onboardingDraft };
-  ["driverName", "carBrand", "carModel", "carYear", "fuelType", "fuelConsumption", "odometer", "rentAmount", "rentFrequency", "rentPaymentDay"].forEach((name) => {
+  ["driverName", "carBrand", "carModel", "carYear", "fuelType", "fuelConsumption", "odometer", "fuelTankCapacity", "fuelPrice", "fuelLeft", "rentAmount", "rentFrequency", "rentPaymentDay"].forEach((name) => {
     const input = root.querySelector(`[name="${name}"]`);
     if (input && source[name] !== undefined && source[name] !== null) input.value = source[name];
   });
@@ -1893,19 +1931,54 @@ async function saveShiftToCloud(shift) {
 
   const ownerPayload = cloudOwnerPayload();
   const payload = stripRemoteId(shift);
+  const shiftColumns = {
+    aggregator: shift.platform || shiftPlatform(shift),
+    start_time: shift.date && shift.start ? new Date(`${shift.date}T${normalizeTime(shift.start)}`).toISOString() : null,
+    end_time: shift.date && shift.end ? new Date(`${shift.date}T${normalizeTime(shift.end)}`).toISOString() : null,
+    start_mileage: Number(shift.odometerStart || shift.startMileage || 0) || null,
+    end_mileage: Number(shift.odometerEnd || shift.endMileage || 0) || null,
+    total_mileage: Number(shift.totalMileage || shift.totalKm || 0) || null,
+    order_mileage: Number(shift.orderMileage || shift.km || 0) || null,
+    idle_mileage: Number(shift.idleMileage || shift.extraKm || 0) || null,
+    idle_percent: Number(shift.idlePercent || 0) || null,
+    orders_count: totalOrders(shift) || null,
+    revenue: Number(shift.gross || 0) || null,
+    fuel_used: Number(shift.fuelUsed || 0) || null,
+    fuel_cost: Number(shift.fuelCost || shift.fuel || 0) || null,
+    rent_part: Number(shift.rentPart || 0) || null,
+    other_expenses: Number(shift.otherExpenses || shift.other || 0) || null,
+    net_profit: Number(net(shift) || 0) || null,
+    revenue_per_km: Number(shift.revenuePerKm || 0) || null,
+    net_profit_per_km: Number(shift.netProfitPerKm || 0) || null,
+    comment: shift.comment || null,
+  };
   try {
     if (shift.remoteId) {
       await cloudRequest("shifts", {
         method: "PATCH",
         query: `?id=eq.${encodeURIComponent(shift.remoteId)}`,
-        body: { payload, ...ownerPayload },
+        body: { payload, ...ownerPayload, ...shiftColumns },
       });
       return shift;
     }
 
-    const [data] = await cloudRequest("shifts", { method: "POST", body: { ...ownerPayload, payload } });
+    const [data] = await cloudRequest("shifts", { method: "POST", body: { ...ownerPayload, payload, ...shiftColumns } });
     return { ...shift, remoteId: data.id };
   } catch (error) {
+    try {
+      if (shift.remoteId) {
+        await cloudRequest("shifts", {
+          method: "PATCH",
+          query: `?id=eq.${encodeURIComponent(shift.remoteId)}`,
+          body: { payload, ...ownerPayload },
+        });
+        return shift;
+      }
+      const [data] = await cloudRequest("shifts", { method: "POST", body: { ...ownerPayload, payload } });
+      return { ...shift, remoteId: data.id };
+    } catch (fallbackError) {
+      console.warn("Shift payload fallback also failed.", fallbackError);
+    }
     console.warn("Shift was saved locally but not synced to Supabase.", error);
     return shift;
   }
@@ -1998,6 +2071,10 @@ function money(value) {
   return `₴ ${new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 0 }).format(Math.round(value || 0))}`;
 }
 
+function formatNumber(value, digits = 1) {
+  return new Intl.NumberFormat("uk-UA", { maximumFractionDigits: digits }).format(Number(value || 0));
+}
+
 function signedMoney(value) {
   const amount = Math.round(Number(value || 0));
   if (!amount) return "₴ 0";
@@ -2032,6 +2109,65 @@ function shiftActualKm(shift) {
   return Number(shift.km || 0);
 }
 
+function shiftRentPart(shift) {
+  if (Number(shift.rentPart || 0) > 0) return Number(shift.rentPart);
+  const date = shift.date || dateKey(new Date());
+  return Number(dailyAllocatedExpenses(date).rent || 0);
+}
+
+function shiftEconomics(shift = {}) {
+  const startMileage = profileNumber(shift.startMileage, shift.odometerStart);
+  const endMileage = profileNumber(shift.endMileage, shift.odometerEnd);
+  const orderMileage = Math.max(0, profileNumber(shift.orderMileage, shift.km) || 0);
+  const totalMileage = Math.max(0, profileNumber(shift.totalMileage, shift.totalKm) || (endMileage > startMileage ? endMileage - startMileage : 0) || orderMileage);
+  const idleMileage = Math.max(0, profileNumber(shift.idleMileage, shift.extraKm) || totalMileage - orderMileage);
+  const fuelConsumption = Math.max(0, profileNumber(shift.fuelConsumption, userProfile.fuelConsumption) || 0);
+  const fuelPrice = Math.max(0, profileNumber(shift.fuelPrice, userProfile.fuelPrice) || 0);
+  const fuelUsed = Math.max(0, profileNumber(shift.fuelUsed) || (totalMileage * fuelConsumption) / 100);
+  const fuelCost = Math.max(0, profileNumber(shift.fuelCost, shift.fuel) || fuelUsed * fuelPrice);
+  const rentPart = Math.max(0, profileNumber(shift.rentPart, shift.rent) || 0);
+  const otherExpenses = Math.max(0, profileNumber(shift.otherExpenses, shift.other) || 0);
+  const revenue = Math.max(0, profileNumber(shift.revenue, shift.gross) || 0);
+  const netProfit = revenue - fuelCost - rentPart - otherExpenses - Math.max(0, Number(shift.fees || 0));
+
+  return {
+    startMileage,
+    endMileage,
+    totalMileage,
+    orderMileage,
+    idleMileage,
+    idlePercent: totalMileage ? (idleMileage / totalMileage) * 100 : 0,
+    fuelConsumption,
+    fuelPrice,
+    fuelUsed,
+    fuelCost,
+    rentPart,
+    otherExpenses,
+    netProfit,
+    revenuePerKm: totalMileage ? revenue / totalMileage : 0,
+    orderRevenuePerKm: orderMileage ? revenue / orderMileage : 0,
+    netProfitPerKm: totalMileage ? netProfit / totalMileage : 0,
+    idleCost: totalMileage ? fuelCost * (idleMileage / totalMileage) : 0,
+  };
+}
+
+function fuelRangeInfo(profile = userProfile) {
+  const fuelLeft = Math.max(0, profileNumber(profile.fuelLeft) || 0);
+  const consumption = Math.max(0, profileNumber(profile.fuelConsumption) || 0);
+  const price = Math.max(0, profileNumber(profile.fuelPrice) || 0);
+  const tankCapacity = Math.max(0, profileNumber(profile.fuelTankCapacity) || 0);
+  const rangeKm = fuelLeft > 0 && consumption > 0 ? (fuelLeft / consumption) * 100 : 0;
+
+  return {
+    fuelLeft,
+    consumption,
+    price,
+    tankCapacity,
+    rangeKm,
+    warning: fuelLeft > 0 && (fuelLeft < 10 || rangeKm < 100),
+  };
+}
+
 function latestKnownOdometer() {
   const candidates = shifts
     .flatMap((shift) => [Number(shift.odometerEnd || 0), Number(shift.odometerStart || 0)])
@@ -2042,12 +2178,22 @@ function latestKnownOdometer() {
 }
 
 function syncStartOdometerDefault() {
-  if (!elements.startOdometer || activeShift || pendingShiftFinish) return;
+  if ((!elements.startOdometer && !elements.startFuelLeft) || activeShift || pendingShiftFinish) return;
   const odometer = latestKnownOdometer();
-  if (odometer > 0 && !elements.startOdometer.value) {
+  if (elements.startOdometer && odometer > 0 && !elements.startOdometer.value) {
     elements.startOdometer.value = Number(odometer.toFixed(1));
   }
-  if (odometer > 0) elements.startOdometer.placeholder = Number(odometer.toFixed(1));
+  if (elements.startOdometer && odometer > 0) elements.startOdometer.placeholder = Number(odometer.toFixed(1));
+  const fuelLeft = profileNumber(userProfile.fuelLeft);
+  if (elements.startFuelLeft && fuelLeft > 0 && !elements.startFuelLeft.value) {
+    elements.startFuelLeft.value = Number(fuelLeft.toFixed(1));
+  }
+  if (elements.startFuelHint) {
+    const range = fuelRangeInfo();
+    elements.startFuelHint.textContent = range.rangeKm
+      ? `Расход ${formatNumber(range.consumption)} л/100 км · цена ${money(range.price)}/л · запас ${Math.round(range.rangeKm)} км`
+      : "Расход и цена топлива подтянутся из кабинета.";
+  }
 }
 
 function net(shift) {
@@ -2072,20 +2218,41 @@ function normalizeShift(shift) {
       Number(shift.grossUklon || 0) +
       Number(shift.grossCash || 0) +
       Number(shift.grossIndrive || 0);
+  const draft = { ...shift, gross };
+  const economics = shiftEconomics(draft);
   return {
     ...shift,
     gross,
-    fuel: Number(shift.fuel || 0),
+    revenue: gross,
+    fuel: Number(shift.fuel || economics.fuelCost || 0),
     rent: Number(shift.rent || 0),
-    other: Number(shift.other || shift.wash || 0),
+    other: Number(shift.other || shift.wash || economics.otherExpenses || 0),
     fees: Number(shift.fees || 0),
     hours: Number(shift.hours || 0),
-    km: Number(shift.km || 0),
-    odometerStart: Number(shift.odometerStart || 0),
-    odometerEnd: Number(shift.odometerEnd || 0),
-    totalKm: Number(shift.totalKm || 0),
-    extraKm: Number(shift.extraKm || 0),
-    actualKm: Number(shift.actualKm || shift.totalKm || 0),
+    km: economics.orderMileage,
+    orderMileage: economics.orderMileage,
+    odometerStart: economics.startMileage || 0,
+    odometerEnd: economics.endMileage || 0,
+    startMileage: economics.startMileage || 0,
+    endMileage: economics.endMileage || 0,
+    totalKm: economics.totalMileage,
+    totalMileage: economics.totalMileage,
+    extraKm: economics.idleMileage,
+    idleMileage: economics.idleMileage,
+    idlePercent: economics.idlePercent,
+    actualKm: Number(shift.actualKm || economics.totalMileage || 0),
+    fuelConsumption: economics.fuelConsumption,
+    fuelPrice: economics.fuelPrice,
+    fuelUsed: economics.fuelUsed,
+    fuelCost: economics.fuelCost,
+    rentPart: economics.rentPart,
+    otherExpenses: economics.otherExpenses,
+    netValue: shift.netValue !== undefined && shift.netValue !== "" ? Number(shift.netValue) : economics.netProfit,
+    netProfit: economics.netProfit,
+    revenuePerKm: economics.revenuePerKm,
+    orderRevenuePerKm: economics.orderRevenuePerKm,
+    netProfitPerKm: economics.netProfitPerKm,
+    idleCost: economics.idleCost,
     ordersBolt: Number(shift.ordersBolt || 0),
     ordersUklon: Number(shift.ordersUklon || 0),
     ordersCash: Number(shift.ordersCash || 0),
@@ -2465,6 +2632,7 @@ function periodSummary(period) {
   const km = sum(current, "km");
   const actualKm = current.reduce((total, shift) => total + shiftActualKm(shift), 0);
   const extraKm = current.reduce((total, shift) => total + Math.max(0, shiftActualKm(shift) - Number(shift.km || 0)), 0);
+  const fuelUsed = sum(current, "fuelUsed");
   const embeddedFuel = sum(current, "fuel");
   const embeddedRent = sum(current, "rent");
   const embeddedOther = sum(current, "other");
@@ -2490,6 +2658,7 @@ function periodSummary(period) {
     km,
     actualKm,
     extraKm,
+    fuelUsed,
     perHour: hours ? currentNet / hours : 0,
     avgRevenue: shiftsWorked ? gross / shiftsWorked : 0,
     avgExpenses: shiftsWorked ? expensesTotal / shiftsWorked : 0,
@@ -2519,6 +2688,7 @@ function summarizeEntries(sourceShifts, sourceExpenses = []) {
   const km = sum(sourceShifts, "km");
   const actualKm = sourceShifts.reduce((total, shift) => total + shiftActualKm(shift), 0);
   const extraKm = sourceShifts.reduce((total, shift) => total + Math.max(0, shiftActualKm(shift) - Number(shift.km || 0)), 0);
+  const fuelUsed = sum(sourceShifts, "fuelUsed");
   const directExpenses = expenseBreakdown(sourceExpenses);
   const fuel = sum(sourceShifts, "fuel") + directExpenses.fuel;
   const rent = sum(sourceShifts, "rent") + directExpenses.rent;
@@ -2537,6 +2707,7 @@ function summarizeEntries(sourceShifts, sourceExpenses = []) {
     km,
     actualKm,
     extraKm,
+    fuelUsed,
     net: gross ? gross - expensesTotal : 0,
     cleanKmPrice: actualKm ? (gross - expensesTotal) / actualKm : 0,
     grossActualKmPrice: actualKm ? gross / actualKm : 0,
@@ -2609,6 +2780,7 @@ function currentWeekSummary() {
   const km = sum(weekShifts, "km");
   const actualKm = weekShifts.reduce((total, shift) => total + shiftActualKm(shift), 0);
   const extraKm = weekShifts.reduce((total, shift) => total + Math.max(0, shiftActualKm(shift) - Number(shift.km || 0)), 0);
+  const fuelUsed = sum(weekShifts, "fuelUsed");
   const fuel = sum(weekShifts, "fuel") + allocatedExpenses.fuel;
   const rent = sum(weekShifts, "rent") + allocatedExpenses.rent;
   const wash = allocatedExpenses.wash;
@@ -2629,6 +2801,7 @@ function currentWeekSummary() {
     km,
     actualKm,
     extraKm,
+    fuelUsed,
     perHour: hours ? currentNet / hours : 0,
     avgRevenue: shiftsWorked ? gross / shiftsWorked : 0,
     avgExpenses: shiftsWorked ? expensesTotal / shiftsWorked : 0,
@@ -2788,6 +2961,7 @@ function renderMetrics(period) {
 
   renderHomeMetrics();
   renderExpenses(summary);
+  renderEfficiency(summary);
   renderGoal(currentWeekSummary());
   renderMiniBars();
   renderDays(periodSummary("all"));
@@ -2816,6 +2990,9 @@ function renderHomeMetrics() {
   elements.homeProfitDelta.className = todayDifference >= 0 ? "profit" : "loss";
   elements.homeTodayNetValue.textContent = money(todaySummary.net);
   elements.homeWeeklyGoalLeft.textContent = money(goalPace.rest);
+  if (elements.homeFuelToday) elements.homeFuelToday.textContent = money(todaySummary.fuel);
+  if (elements.homeRealMileage) elements.homeRealMileage.textContent = `${formatNumber(todaySummary.actualKm)} км`;
+  if (elements.homeIdleMileage) elements.homeIdleMileage.textContent = `${formatNumber(todaySummary.extraKm)} км`;
 
   elements.homeWeekNet.textContent = money(goalPace.earned);
   elements.homeGoalPercent.textContent = `${goalPace.progress}%`;
@@ -2835,6 +3012,13 @@ function renderHomeMetrics() {
   elements.homeOpsText.textContent = `${Number(week.km.toFixed(1))} км заказов · ${Number(week.actualKm.toFixed(1))} км всего · ${emptyMileageShare}% пустой`;
   elements.homeKmPriceText.textContent = `${money(cleanKmPrice)} за реальный км · ${qualityOk ? "норма" : "ниже 25"}`;
   elements.homeKmPriceText.className = qualityOk ? "profit" : "loss";
+  if (elements.homeFuelRangeText) {
+    const range = fuelRangeInfo();
+    elements.homeFuelRangeText.textContent = range.rangeKm
+      ? `${range.warning ? "Скоро потребуется заправка · " : ""}${formatNumber(range.fuelLeft)} л · запас ${Math.round(range.rangeKm)} км`
+      : "Укажи остаток топлива в кабинете";
+    elements.homeFuelRangeText.className = range.warning ? "loss" : "profit";
+  }
   renderHomeMiniBars();
 }
 
@@ -2942,6 +3126,26 @@ function renderExpenses(summary) {
   elements.fineExpense.textContent = money(summary.fine);
   elements.repairExpense.textContent = money(summary.repair);
   elements.otherExpense.textContent = money(summary.other + summary.fees);
+}
+
+function renderEfficiency(summary) {
+  const totalMileage = Number(summary.actualKm || 0);
+  const orderMileage = Number(summary.km || 0);
+  const idleMileage = Number(summary.extraKm || 0);
+  const idlePercent = totalMileage ? Math.round((idleMileage / totalMileage) * 100) : 0;
+  const fuelUsed = Number(summary.fuelUsed || 0);
+  const fuelCost = Number(summary.fuel || summary.fuelCost || 0);
+  const idleCost = totalMileage ? fuelCost * (idleMileage / totalMileage) : 0;
+
+  if (elements.idleMileageBadge) elements.idleMileageBadge.textContent = `${formatNumber(idleMileage)} км / ${idlePercent}%`;
+  if (elements.effTotalMileage) elements.effTotalMileage.textContent = `${formatNumber(totalMileage)} км`;
+  if (elements.effOrderMileage) elements.effOrderMileage.textContent = `${formatNumber(orderMileage)} км`;
+  if (elements.effIdleMileage) elements.effIdleMileage.textContent = `${formatNumber(idleMileage)} км`;
+  if (elements.effIdleCost) elements.effIdleCost.textContent = money(idleCost);
+  if (elements.effNetKm) elements.effNetKm.textContent = totalMileage ? `${money(summary.cleanKmPrice)}/км` : "Недостаточно данных";
+  if (elements.effRevenueKm) elements.effRevenueKm.textContent = totalMileage ? `${money(summary.grossActualKmPrice)}/км` : "Недостаточно данных";
+  if (elements.effFuelUsed) elements.effFuelUsed.textContent = `${formatNumber(fuelUsed)} л`;
+  if (elements.effFuelCost) elements.effFuelCost.textContent = money(fuelCost);
 }
 
 function renderGoal(summary) {
@@ -3187,7 +3391,7 @@ function renderAll() {
 }
 
 function readNumber(formData, key) {
-  return Number(formData.get(key) || 0);
+  return Number(String(formData.get(key) || 0).replace(",", "."));
 }
 
 function shiftPlatform(shift) {
@@ -3304,6 +3508,7 @@ function renderShiftRunner() {
 
 function startRunnerShift() {
   const odometerStart = readNumber({ get: (name) => (name === "odometerStart" ? elements.startOdometer?.value : "") }, "odometerStart");
+  const fuelLeft = readNumber({ get: (name) => (name === "fuelLeft" ? elements.startFuelLeft?.value : "") }, "fuelLeft");
   if (!odometerStart && odometerStart !== 0) return;
   if (!Number.isFinite(odometerStart) || odometerStart <= 0) {
     elements.startOdometer?.focus();
@@ -3315,6 +3520,9 @@ function startRunnerShift() {
     platform: selectedRunnerPlatform,
     startedAt: new Date().toISOString(),
     odometerStart,
+    fuelLeftStart: Number.isFinite(fuelLeft) && fuelLeft > 0 ? fuelLeft : profileNumber(userProfile.fuelLeft) || 0,
+    fuelConsumption: profileNumber(userProfile.fuelConsumption) || 0,
+    fuelPrice: profileNumber(userProfile.fuelPrice) || 0,
   };
   pendingShiftFinish = null;
   saveActiveShift();
@@ -3338,7 +3546,8 @@ function cancelActiveRunnerShift() {
 
   pendingShiftFinish = null;
   clearActiveShift();
-  elements.startOdometer.value = "";
+  if (elements.startOdometer) elements.startOdometer.value = "";
+  if (elements.startFuelLeft) elements.startFuelLeft.value = "";
   renderShiftRunner();
 }
 
@@ -3354,6 +3563,16 @@ function runnerShiftFromForm(formData) {
   const totalKm = Math.max(0, odometerEnd - odometerStart);
   const extraKm = Math.max(0, totalKm - orderKm);
   const platform = pendingShiftFinish.platform;
+  const didRefuel = formData.get("didRefuel") === "on";
+  const refuelLiters = didRefuel ? readNumber(formData, "refuelLiters") : 0;
+  const refuelCost = didRefuel ? readNumber(formData, "refuelCost") : 0;
+  const refuelPrice = didRefuel ? readNumber(formData, "refuelPrice") || (refuelLiters ? refuelCost / refuelLiters : 0) : 0;
+  const refuelMileage = didRefuel ? readNumber(formData, "refuelMileage") : 0;
+  const fuelConsumption = profileNumber(pendingShiftFinish.fuelConsumption, userProfile.fuelConsumption) || 0;
+  const fuelPrice = profileNumber(refuelPrice, pendingShiftFinish.fuelPrice, userProfile.fuelPrice) || 0;
+  const fuelUsed = totalKm && fuelConsumption ? (totalKm * fuelConsumption) / 100 : 0;
+  const fuelCost = fuelUsed * fuelPrice;
+  const rentPart = shiftRentPart({ date: localDateKey(started) });
   const comment = String(formData.get("comment") || "").trim();
   const odometerComment = odometerStart && odometerEnd
     ? `Одометр ${odometerStart.toFixed(1)}-${odometerEnd.toFixed(1)}; всего ${totalKm.toFixed(1)} км; пустой пробег ${extraKm.toFixed(1)} км`
@@ -3370,13 +3589,32 @@ function runnerShiftFromForm(formData) {
     ordersCash: platform === "InDrive" || platform === "Indrive" ? orders : 0,
     ...platformValues(platform, gross),
     gross,
+    revenue: gross,
     other: expensesValue,
+    otherExpenses: expensesValue,
     km: orderKm,
+    orderMileage: orderKm,
     odometerStart,
     odometerEnd,
+    startMileage: odometerStart,
+    endMileage: odometerEnd,
     totalKm,
+    totalMileage: totalKm,
     actualKm: totalKm,
     extraKm,
+    idleMileage: extraKm,
+    fuel: fuelCost,
+    fuelConsumption,
+    fuelPrice,
+    fuelUsed,
+    fuelCost,
+    rent: 0,
+    rentPart,
+    refuelLiters,
+    refuelCost,
+    refuelPrice,
+    refuelMileage,
+    fuelLeftStart: profileNumber(pendingShiftFinish.fuelLeftStart) || 0,
     comment: [comment, odometerComment].filter(Boolean).join(" · "),
   });
 }
@@ -4151,7 +4389,14 @@ elements.finishShiftForm?.addEventListener("submit", async (event) => {
   shifts.push(nextShift);
   await sendToGoogleSheet("shift", nextShift);
   if (Number(nextShift.odometerEnd || 0) > 0) {
-    userProfile = { ...userProfile, odometer: Number(nextShift.odometerEnd).toFixed(1) };
+    const previousFuelLeft = profileNumber(nextShift.fuelLeftStart, userProfile.fuelLeft) || 0;
+    const nextFuelLeft = Math.max(0, previousFuelLeft - Number(nextShift.fuelUsed || 0) + Number(nextShift.refuelLiters || 0));
+    userProfile = {
+      ...userProfile,
+      odometer: Number(nextShift.odometerEnd).toFixed(1),
+      fuelLeft: nextFuelLeft ? Number(nextFuelLeft.toFixed(1)) : "",
+      fuelPrice: Number(nextShift.refuelPrice || 0) > 0 ? Number(nextShift.refuelPrice) : userProfile.fuelPrice,
+    };
     writeStorage(JSON.stringify(userProfile), PROFILE_STORAGE_KEY);
     fillProfileForm();
     await saveUserProfile(userProfile);
