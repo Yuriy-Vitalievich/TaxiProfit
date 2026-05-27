@@ -22,6 +22,40 @@
   --shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
 }
 
+.empty-page {
+  min-height: min(620px, calc(100svh - 180px));
+  display: grid;
+  align-content: center;
+  gap: 18px;
+  padding: clamp(28px, 6vw, 56px);
+}
+
+.empty-page h1 {
+  margin: 0;
+  max-width: 760px;
+  font-size: clamp(42px, 7vw, 84px);
+  line-height: 0.95;
+}
+
+.empty-page p {
+  margin: 0;
+  max-width: 640px;
+  color: var(--muted);
+  font-size: clamp(18px, 2.4vw, 25px);
+  line-height: 1.45;
+}
+
+.stats-period-controls.hidden {
+  display: none;
+}
+
+@media (max-width: 620px) {
+  .empty-page {
+    min-height: calc(100svh - 210px);
+    padding: 30px 22px;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
