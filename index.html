@@ -10,11 +10,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="TaxiProfit - мобильный cockpit для учета смен, расходов и прибыли водителя такси." />
     <title>TaxiProfit</title>
-    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260527-5" />
+    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260527-4" />
     <link rel="icon" href="assets/icons/taxiprofit-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/icons/taxiprofit-icon.svg" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=telegram-20260527-5" />
+    <link rel="stylesheet" href="styles.css?v=telegram-20260527-4" />
   </head>
   <body>
     <section class="onboarding-overlay" id="onboardingOverlay" hidden aria-label="Регистрация водителя">
@@ -60,18 +60,6 @@
             <label>
               Средний расход, л/100км
               <input name="fuelConsumption" type="number" min="0" step="0.1" placeholder="6.5" />
-            </label>
-            <label>
-              Объем бака, л
-              <input name="fuelTankCapacity" type="number" min="0" step="0.1" placeholder="45" />
-            </label>
-            <label>
-              Цена топлива, ₴/л
-              <input name="fuelPrice" type="number" min="0" step="0.01" placeholder="58" />
-            </label>
-            <label>
-              Остаток топлива, л
-              <input name="fuelLeft" type="number" min="0" step="0.1" placeholder="18" />
             </label>
           </div>
         </div>
@@ -263,11 +251,6 @@
               Пробег на авто сейчас
               <input id="startOdometer" type="number" min="0" step="0.1" inputmode="decimal" placeholder="125430.5" required />
             </label>
-            <label class="runner-field">
-              Остаток топлива, л
-              <input id="startFuelLeft" type="number" min="0" step="0.1" inputmode="decimal" placeholder="18" />
-            </label>
-            <p class="runner-fuel-hint" id="startFuelHint">Расход и цена топлива подтянутся из кабинета.</p>
             <button class="submit-button runner-primary" type="button" id="startShiftButton">▶ Начать смену</button>
           </div>
 
@@ -315,26 +298,6 @@
                 Расходы, ₴
                 <input name="expenses" type="number" min="0" step="0.01" placeholder="0" />
               </label>
-              <label class="wide-field checkbox-line">
-                <input name="didRefuel" type="checkbox" />
-                <span>Была заправка во время смены</span>
-              </label>
-              <label>
-                Заправка, л
-                <input name="refuelLiters" type="number" min="0" step="0.1" placeholder="0" />
-              </label>
-              <label>
-                Заправка, ₴
-                <input name="refuelCost" type="number" min="0" step="0.01" placeholder="0" />
-              </label>
-              <label>
-                Цена, ₴/л
-                <input name="refuelPrice" type="number" min="0" step="0.01" placeholder="58" />
-              </label>
-              <label>
-                Пробег на заправке
-                <input name="refuelMileage" type="number" min="0" step="0.1" placeholder="125480" />
-              </label>
               <label class="wide-field">
                 Комментарий
                 <input name="comment" type="text" placeholder="заметка по смене" />
@@ -366,18 +329,6 @@
                 <div>
                   <span>До недельной цели</span>
                   <strong id="homeWeeklyGoalLeft">₴ 0</strong>
-                </div>
-                <div>
-                  <span>Топливо сегодня</span>
-                  <strong id="homeFuelToday">₴ 0</strong>
-                </div>
-                <div>
-                  <span>Реальный пробег</span>
-                  <strong id="homeRealMileage">0 км</strong>
-                </div>
-                <div>
-                  <span>Холостой пробег</span>
-                  <strong id="homeIdleMileage">0 км</strong>
                 </div>
               </div>
             </div>
@@ -464,10 +415,6 @@
               <article class="insight-card tariff">
                 <strong>Стоимость км</strong>
                 <p id="homeKmPriceText">₴ 0 за км</p>
-              </article>
-              <article class="insight-card fuel">
-                <strong>Запас топлива</strong>
-                <p id="homeFuelRangeText">Недостаточно данных</p>
               </article>
             </div>
           </article>
@@ -612,26 +559,6 @@
               <li><span class="dot repair"></span>Ремонт <strong id="repairExpense">₴ 0</strong></li>
               <li><span class="dot fee"></span>Прочее <strong id="otherExpense">₴ 0</strong></li>
             </ul>
-          </article>
-
-          <article class="panel efficiency-panel">
-            <div class="section-head tight">
-              <div>
-                <span class="section-kicker">Пробег</span>
-                <h2>Эффективность пробега</h2>
-              </div>
-              <strong id="idleMileageBadge">0 км / 0%</strong>
-            </div>
-            <div class="efficiency-grid">
-              <div><span>Общий пробег</span><strong id="effTotalMileage">0 км</strong></div>
-              <div><span>Км по заказам</span><strong id="effOrderMileage">0 км</strong></div>
-              <div><span>Холостой пробег</span><strong id="effIdleMileage">0 км</strong></div>
-              <div><span>Стоимость холостого</span><strong id="effIdleCost">₴ 0</strong></div>
-              <div><span>Реальная цена 1 км</span><strong id="effNetKm">₴ 0</strong></div>
-              <div><span>Выручка за 1 км</span><strong id="effRevenueKm">₴ 0</strong></div>
-              <div><span>Расход топлива</span><strong id="effFuelUsed">0 л</strong></div>
-              <div><span>Стоимость топлива</span><strong id="effFuelCost">₴ 0</strong></div>
-            </div>
           </article>
         </section>
       </main>
@@ -924,28 +851,6 @@
                 Расход топлива, л/100 км
                 <input name="fuelConsumption" type="number" min="0" step="0.1" inputmode="decimal" placeholder="6.5" />
               </label>
-              <label>
-                Тип топлива
-                <select name="fuelType">
-                  <option value="Бензин">Бензин</option>
-                  <option value="Дизель">Дизель</option>
-                  <option value="Газ">Газ</option>
-                  <option value="Гибрид">Гибрид</option>
-                  <option value="Электро">Электро</option>
-                </select>
-              </label>
-              <label>
-                Объем бака, л
-                <input name="fuelTankCapacity" type="number" min="0" step="0.1" inputmode="decimal" placeholder="45" />
-              </label>
-              <label>
-                Цена топлива, ₴/л
-                <input name="fuelPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="58" />
-              </label>
-              <label>
-                Остаток топлива, л
-                <input name="fuelLeft" type="number" min="0" step="0.1" inputmode="decimal" placeholder="18" />
-              </label>
             </div>
 
             <div class="profile-form-actions">
@@ -989,6 +894,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=telegram-20260527-5"></script>
+    <script src="app.js?v=telegram-20260527-4"></script>
   </body>
 </html>

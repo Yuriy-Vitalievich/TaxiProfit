@@ -13,9 +13,6 @@ create table if not exists public.profiles (
   fuel_type text,
   fuel_consumption numeric,
   odometer numeric,
-  fuel_tank_capacity numeric,
-  fuel_price numeric,
-  current_fuel_left numeric,
   car_number text,
   default_platform text,
   rent_amount numeric,
@@ -49,42 +46,6 @@ create table if not exists public.expenses (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists public.vehicles (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) on delete cascade,
-  telegram_id bigint,
-  ownership_type text,
-  brand text,
-  model text,
-  current_mileage numeric,
-  fuel_consumption numeric,
-  fuel_tank_capacity numeric,
-  fuel_type text,
-  fuel_price numeric,
-  current_fuel_left numeric,
-  rent_amount numeric,
-  rent_period text,
-  rent_payment_day text,
-  payload jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists public.fuel_logs (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) on delete cascade,
-  telegram_id bigint,
-  shift_id uuid,
-  date date,
-  mileage numeric,
-  liters numeric,
-  total_cost numeric,
-  price_per_liter numeric,
-  payload jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
 create table if not exists public.settings (
   id uuid default gen_random_uuid(),
   key text primary key,
@@ -100,26 +61,6 @@ alter table public.shifts add column if not exists user_id uuid references auth.
 alter table public.expenses add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table public.settings add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table public.shifts add column if not exists telegram_id bigint;
-alter table public.shifts add column if not exists vehicle_id uuid;
-alter table public.shifts add column if not exists aggregator text;
-alter table public.shifts add column if not exists start_time timestamptz;
-alter table public.shifts add column if not exists end_time timestamptz;
-alter table public.shifts add column if not exists start_mileage numeric;
-alter table public.shifts add column if not exists end_mileage numeric;
-alter table public.shifts add column if not exists total_mileage numeric;
-alter table public.shifts add column if not exists order_mileage numeric;
-alter table public.shifts add column if not exists idle_mileage numeric;
-alter table public.shifts add column if not exists idle_percent numeric;
-alter table public.shifts add column if not exists orders_count integer;
-alter table public.shifts add column if not exists revenue numeric;
-alter table public.shifts add column if not exists fuel_used numeric;
-alter table public.shifts add column if not exists fuel_cost numeric;
-alter table public.shifts add column if not exists rent_part numeric;
-alter table public.shifts add column if not exists other_expenses numeric;
-alter table public.shifts add column if not exists net_profit numeric;
-alter table public.shifts add column if not exists revenue_per_km numeric;
-alter table public.shifts add column if not exists net_profit_per_km numeric;
-alter table public.shifts add column if not exists comment text;
 alter table public.expenses add column if not exists telegram_id bigint;
 alter table public.settings add column if not exists telegram_id bigint;
 alter table public.profiles add column if not exists car_ownership text;
@@ -128,9 +69,6 @@ alter table public.profiles add column if not exists car_year integer;
 alter table public.profiles add column if not exists fuel_type text;
 alter table public.profiles add column if not exists fuel_consumption numeric;
 alter table public.profiles add column if not exists odometer numeric;
-alter table public.profiles add column if not exists fuel_tank_capacity numeric;
-alter table public.profiles add column if not exists fuel_price numeric;
-alter table public.profiles add column if not exists current_fuel_left numeric;
 alter table public.profiles add column if not exists rent_amount numeric;
 alter table public.profiles add column if not exists rent_frequency text;
 alter table public.profiles add column if not exists rent_payment_day text;
@@ -175,20 +113,12 @@ create index if not exists profiles_telegram_id_idx
 on public.profiles(telegram_id)
 where telegram_id is not null;
 
-create index if not exists vehicles_telegram_id_idx
-on public.vehicles(telegram_id)
-where telegram_id is not null;
-
 create index if not exists shifts_telegram_id_idx
 on public.shifts(telegram_id)
 where telegram_id is not null;
 
 create index if not exists expenses_telegram_id_idx
 on public.expenses(telegram_id)
-where telegram_id is not null;
-
-create index if not exists fuel_logs_telegram_id_idx
-on public.fuel_logs(telegram_id)
 where telegram_id is not null;
 
 create index if not exists settings_telegram_id_idx
@@ -324,9 +254,6 @@ begin
     fuel_type,
     fuel_consumption,
     odometer,
-    fuel_tank_capacity,
-    fuel_price,
-    current_fuel_left,
     car_number,
     default_platform,
     rent_amount,
@@ -352,9 +279,6 @@ begin
     coalesce(profile_payload ->> 'fuel_type', ''),
     nullif(profile_payload ->> 'fuel_consumption', '')::numeric,
     nullif(profile_payload ->> 'odometer', '')::numeric,
-    nullif(profile_payload ->> 'fuel_tank_capacity', '')::numeric,
-    nullif(profile_payload ->> 'fuel_price', '')::numeric,
-    nullif(profile_payload ->> 'current_fuel_left', '')::numeric,
     coalesce(profile_payload ->> 'car_number', ''),
     coalesce(profile_payload ->> 'default_platform', 'Bolt'),
     nullif(profile_payload ->> 'rent_amount', '')::numeric,
@@ -380,9 +304,6 @@ begin
     fuel_type = excluded.fuel_type,
     fuel_consumption = excluded.fuel_consumption,
     odometer = excluded.odometer,
-    fuel_tank_capacity = excluded.fuel_tank_capacity,
-    fuel_price = excluded.fuel_price,
-    current_fuel_left = excluded.current_fuel_left,
     car_number = excluded.car_number,
     default_platform = excluded.default_platform,
     rent_amount = excluded.rent_amount,
@@ -403,8 +324,6 @@ $$;
 alter table public.shifts replica identity full;
 alter table public.expenses replica identity full;
 alter table public.settings replica identity full;
-alter table public.fuel_logs replica identity full;
-alter table public.vehicles replica identity full;
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -425,18 +344,6 @@ execute function public.set_updated_at();
 drop trigger if exists set_expenses_updated_at on public.expenses;
 create trigger set_expenses_updated_at
 before update on public.expenses
-for each row
-execute function public.set_updated_at();
-
-drop trigger if exists set_fuel_logs_updated_at on public.fuel_logs;
-create trigger set_fuel_logs_updated_at
-before update on public.fuel_logs
-for each row
-execute function public.set_updated_at();
-
-drop trigger if exists set_vehicles_updated_at on public.vehicles;
-create trigger set_vehicles_updated_at
-before update on public.vehicles
 for each row
 execute function public.set_updated_at();
 
@@ -491,8 +398,6 @@ alter table public.profiles enable row level security;
 alter table public.shifts enable row level security;
 alter table public.expenses enable row level security;
 alter table public.settings enable row level security;
-alter table public.fuel_logs enable row level security;
-alter table public.vehicles enable row level security;
 
 drop policy if exists "Users read own profile" on public.profiles;
 create policy "Users read own profile"
@@ -617,96 +522,6 @@ using (
   or public.user_matches_current_telegram(user_id)
 );
 
-drop policy if exists "Users read own fuel logs" on public.fuel_logs;
-create policy "Users read own fuel logs"
-on public.fuel_logs for select
-to authenticated
-using (
-  user_id = auth.uid()
-  or public.row_matches_current_telegram(telegram_id)
-  or public.user_matches_current_telegram(user_id)
-);
-
-drop policy if exists "Users insert own fuel logs" on public.fuel_logs;
-create policy "Users insert own fuel logs"
-on public.fuel_logs for insert
-to authenticated
-with check (
-  user_id = auth.uid()
-  or public.row_matches_current_telegram(telegram_id)
-  or public.user_matches_current_telegram(user_id)
-);
-
-drop policy if exists "Users update own fuel logs" on public.fuel_logs;
-create policy "Users update own fuel logs"
-on public.fuel_logs for update
-to authenticated
-using (
-  user_id = auth.uid()
-  or public.row_matches_current_telegram(telegram_id)
-  or public.user_matches_current_telegram(user_id)
-)
-with check (
-  user_id = auth.uid()
-  or public.row_matches_current_telegram(telegram_id)
-  or public.user_matches_current_telegram(user_id)
-);
-
-drop policy if exists "Users delete own fuel logs" on public.fuel_logs;
-create policy "Users delete own fuel logs"
-on public.fuel_logs for delete
-to authenticated
-using (
-  user_id = auth.uid()
-  or public.row_matches_current_telegram(telegram_id)
-  or public.user_matches_current_telegram(user_id)
-);
-
-drop policy if exists "Users read own vehicles" on public.vehicles;
-create policy "Users read own vehicles"
-on public.vehicles for select
-to authenticated
-using (
-  user_id = auth.uid()
-  or public.row_matches_current_telegram(telegram_id)
-  or public.user_matches_current_telegram(user_id)
-);
-
-drop policy if exists "Users insert own vehicles" on public.vehicles;
-create policy "Users insert own vehicles"
-on public.vehicles for insert
-to authenticated
-with check (
-  user_id = auth.uid()
-  or public.row_matches_current_telegram(telegram_id)
-  or public.user_matches_current_telegram(user_id)
-);
-
-drop policy if exists "Users update own vehicles" on public.vehicles;
-create policy "Users update own vehicles"
-on public.vehicles for update
-to authenticated
-using (
-  user_id = auth.uid()
-  or public.row_matches_current_telegram(telegram_id)
-  or public.user_matches_current_telegram(user_id)
-)
-with check (
-  user_id = auth.uid()
-  or public.row_matches_current_telegram(telegram_id)
-  or public.user_matches_current_telegram(user_id)
-);
-
-drop policy if exists "Users delete own vehicles" on public.vehicles;
-create policy "Users delete own vehicles"
-on public.vehicles for delete
-to authenticated
-using (
-  user_id = auth.uid()
-  or public.row_matches_current_telegram(telegram_id)
-  or public.user_matches_current_telegram(user_id)
-);
-
 drop policy if exists "Public read settings" on public.settings;
 drop policy if exists "Users read own settings" on public.settings;
 create policy "Users read own settings"
@@ -786,26 +601,6 @@ begin
         and tablename = 'profiles'
     ) then
       alter publication supabase_realtime add table public.profiles;
-    end if;
-
-    if not exists (
-      select 1
-      from pg_publication_tables
-      where pubname = 'supabase_realtime'
-        and schemaname = 'public'
-        and tablename = 'fuel_logs'
-    ) then
-      alter publication supabase_realtime add table public.fuel_logs;
-    end if;
-
-    if not exists (
-      select 1
-      from pg_publication_tables
-      where pubname = 'supabase_realtime'
-        and schemaname = 'public'
-        and tablename = 'vehicles'
-    ) then
-      alter publication supabase_realtime add table public.vehicles;
     end if;
   end if;
 end
