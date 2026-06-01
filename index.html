@@ -10,11 +10,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="TaxiProfit - мобильный cockpit для водителя такси." />
     <title>TaxiProfit</title>
-    <link rel="manifest" href="manifest.webmanifest?v=blank-shell-1" />
+    <link rel="manifest" href="manifest.webmanifest?v=telegram-mvp-1" />
     <link rel="icon" href="assets/icons/taxiprofit-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/icons/taxiprofit-icon.svg" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=blank-shell-1" />
+    <link rel="stylesheet" href="styles.css?v=telegram-mvp-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -97,7 +97,8 @@
         <section class="panel empty-page">
           <span class="section-kicker">Главная</span>
           <h1>Главная</h1>
-          <p>Пустой стартовый экран. Сюда первым шагом добавим главный пользовательский сценарий.</p>
+          <p>Чистый экран для главного сценария. Начнем с простой смены и будем добавлять аналитику только после того, как логика станет понятной.</p>
+          <button class="submit-button shell-cta" type="button" data-view="start">Начать смену</button>
         </section>
       </main>
 
@@ -110,10 +111,43 @@
       </main>
 
       <main class="start-shift-view view-panel" data-view-panel="start">
-        <section class="panel empty-page">
-          <span class="section-kicker">Смена</span>
-          <h1>Начать смену</h1>
-          <p>Здесь позже появится простой сценарий старта смены: агрегатор, пробег и кнопка запуска.</p>
+        <section class="panel shift-runner" id="shiftRunner">
+          <div class="runner-state active" data-runner-state="idle">
+            <span class="section-kicker">Смена</span>
+            <h1>Где сегодня работаешь?</h1>
+            <div class="platform-choice" role="group" aria-label="Выбор агрегатора">
+              <button class="platform-option active" type="button" data-platform="Bolt">Bolt</button>
+              <button class="platform-option" type="button" data-platform="Uklon">Uklon</button>
+              <button class="platform-option" type="button" data-platform="InDrive">InDrive</button>
+            </div>
+            <label class="runner-field">
+              <span>Пробег на старте</span>
+              <input id="startMileageInput" type="number" inputmode="decimal" min="0" step="0.1" placeholder="Например 125430" />
+            </label>
+            <button class="submit-button" type="button" id="startShiftButton">Начать смену</button>
+          </div>
+
+          <div class="runner-state" data-runner-state="active">
+            <span class="section-kicker">Активная смена</span>
+            <div class="active-shift-head">
+              <div>
+                <h1 id="activeShiftPlatform">Bolt</h1>
+                <p id="activeShiftMeta">Старт смены</p>
+              </div>
+              <strong id="activeShiftTimer">00:00:00</strong>
+            </div>
+            <div class="runner-actions">
+              <button class="ghost-button danger" type="button" id="cancelShiftButton">Отменить</button>
+              <button class="submit-button" type="button" id="finishShiftButton">Завершить смену</button>
+            </div>
+          </div>
+
+          <div class="runner-state" data-runner-state="finished">
+            <span class="section-kicker">Финиш</span>
+            <h1>Смена завершена</h1>
+            <p id="finishedShiftMeta">Данные финиша добавим следующим шагом.</p>
+            <button class="submit-button" type="button" id="newShiftButton">Начать новую смену</button>
+          </div>
         </section>
       </main>
 
@@ -150,6 +184,6 @@
       </main>
     </div>
 
-    <script src="app.js?v=blank-shell-1"></script>
+    <script src="app.js?v=telegram-mvp-1"></script>
   </body>
 </html>

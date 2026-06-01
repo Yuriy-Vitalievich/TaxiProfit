@@ -1,10 +1,14 @@
-const APP_VERSION = "blank-shell-1";
+const APP_VERSION = "telegram-mvp-1";
 const VIEW_IDS = new Set(["home", "dashboard", "start", "archive", "data", "history", "profile"]);
+const ACTIVE_SHIFT_KEY = "taxiprofit.activeShift.mvp1";
 
 const tg = window.Telegram?.WebApp;
+let activeShift = loadActiveShift();
+let timerId = null;
 
 if (tg) {
   document.documentElement.classList.add("has-telegram-sdk");
+  document.body?.classList.add("telegram-mini-app");
   try {
     tg.ready();
     tg.expand();
@@ -23,6 +27,18 @@ const settingsButton = document.querySelector("#settingsButton");
 const navLinks = [...document.querySelectorAll("[data-view]")];
 const viewPanels = [...document.querySelectorAll("[data-view-panel]")];
 const pullRefresh = document.querySelector("#pullRefresh");
+const runnerStates = [...document.querySelectorAll("[data-runner-state]")];
+const platformButtons = [...document.querySelectorAll("[data-platform]")];
+const startMileageInput = document.querySelector("#startMileageInput");
+const startShiftButton = document.querySelector("#startShiftButton");
+const activeShiftPlatform = document.querySelector("#activeShiftPlatform");
+const activeShiftMeta = document.querySelector("#activeShiftMeta");
+const activeShiftTimer = document.querySelector("#activeShiftTimer");
+const cancelShiftButton = document.querySelector("#cancelShiftButton");
+const finishShiftButton = document.querySelector("#finishShiftButton");
+const finishedShiftMeta = document.querySelector("#finishedShiftMeta");
+const newShiftButton = document.querySelector("#newShiftButton");
+let selectedPlatform = "Bolt";
 
 function viewFromHash() {
   const hash = window.location.hash.replace("#", "");
@@ -108,6 +124,120 @@ function initNavigation() {
   menuOverlay?.addEventListener("click", closeMenu);
 
   window.addEventListener("hashchange", () => setView(viewFromHash(), { updateHash: false, instant: true }));
+}
+
+function loadActiveShift() {
+  try {
+    return JSON.parse(localStorage.getItem(ACTIVE_SHIFT_KEY)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function saveActiveShift(shift) {
+  activeShift = shift;
+  if (shift) {
+    localStorage.setItem(ACTIVE_SHIFT_KEY, JSON.stringify(shift));
+  } else {
+    localStorage.removeItem(ACTIVE_SHIFT_KEY);
+  }
+}
+
+function formatDateTime(timestamp) {
+  return new Intl.DateTimeFormat("ru-UA", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+}
+
+function formatDuration(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+  const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return `${hours}:${minutes}:${seconds}`;
+}
+
+function setRunnerState(state) {
+  runnerStates.forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.runnerState === state);
+  });
+}
+
+function renderShiftRunner() {
+  if (!runnerStates.length) return;
+
+  if (!activeShift) {
+    setRunnerState("idle");
+    stopTimer();
+    return;
+  }
+
+  activeShiftPlatform.textContent = activeShift.platform;
+  activeShiftMeta.textContent = `${formatDateTime(activeShift.startedAt)} · старт ${activeShift.startMileage || "—"} км`;
+  setRunnerState("active");
+  startTimer();
+}
+
+function startTimer() {
+  stopTimer();
+  const tick = () => {
+    if (!activeShift || !activeShiftTimer) return;
+    activeShiftTimer.textContent = formatDuration(Date.now() - activeShift.startedAt);
+  };
+  tick();
+  timerId = window.setInterval(tick, 1000);
+}
+
+function stopTimer() {
+  if (!timerId) return;
+  window.clearInterval(timerId);
+  timerId = null;
+}
+
+function initShiftRunner() {
+  platformButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedPlatform = button.dataset.platform;
+      platformButtons.forEach((item) => item.classList.toggle("active", item === button));
+    });
+  });
+
+  startShiftButton?.addEventListener("click", () => {
+    const mileage = startMileageInput?.value.trim() || "";
+    const shift = {
+      platform: selectedPlatform,
+      startMileage: mileage,
+      startedAt: Date.now(),
+    };
+    saveActiveShift(shift);
+    renderShiftRunner();
+  });
+
+  cancelShiftButton?.addEventListener("click", () => {
+    const approved = window.confirm("Отменить активную смену?");
+    if (!approved) return;
+    saveActiveShift(null);
+    renderShiftRunner();
+  });
+
+  finishShiftButton?.addEventListener("click", () => {
+    if (!activeShift) return;
+    const finishedAt = Date.now();
+    const summary = `${activeShift.platform} · ${formatDuration(finishedAt - activeShift.startedAt)} · старт ${activeShift.startMileage || "—"} км`;
+    saveActiveShift(null);
+    stopTimer();
+    if (finishedShiftMeta) finishedShiftMeta.textContent = summary;
+    setRunnerState("finished");
+  });
+
+  newShiftButton?.addEventListener("click", () => {
+    setRunnerState("idle");
+  });
+
+  renderShiftRunner();
 }
 
 function initSwipeMenu() {
@@ -201,6 +331,7 @@ async function initServiceWorker() {
 
 applyTelegramUser();
 initNavigation();
+initShiftRunner();
 initSwipeMenu();
 initPullRefresh();
 setView(viewFromHash(), { replace: true, instant: true });

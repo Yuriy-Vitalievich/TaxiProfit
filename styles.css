@@ -49,10 +49,139 @@
   display: none;
 }
 
+.shell-cta {
+  width: min(360px, 100%);
+  margin-top: 8px;
+}
+
+.shift-runner {
+  display: grid;
+  gap: 26px;
+}
+
+.runner-state {
+  display: none;
+}
+
+.runner-state.active {
+  display: grid;
+  gap: 24px;
+}
+
+.runner-state h1 {
+  margin: 0;
+  font-size: clamp(38px, 7vw, 72px);
+  line-height: 0.98;
+}
+
+.runner-state p {
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(17px, 2vw, 23px);
+  line-height: 1.45;
+}
+
+.platform-choice {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.platform-option {
+  min-height: 76px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.055);
+  font: inherit;
+  font-size: clamp(19px, 2.3vw, 28px);
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.platform-option.active {
+  color: var(--profit);
+  border-color: rgba(40, 242, 156, 0.55);
+  background: linear-gradient(135deg, rgba(40, 242, 156, 0.18), rgba(74, 168, 255, 0.1));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 16px 40px rgba(40, 242, 156, 0.12);
+}
+
+.runner-field {
+  display: grid;
+  gap: 10px;
+  color: var(--muted);
+  font-size: clamp(16px, 2vw, 22px);
+  font-weight: 900;
+}
+
+.runner-field input {
+  width: 100%;
+  min-height: 74px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 0 22px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.065);
+  font: inherit;
+  font-size: clamp(21px, 2.8vw, 34px);
+  font-weight: 900;
+  outline: none;
+}
+
+.runner-field input:focus {
+  border-color: rgba(40, 242, 156, 0.58);
+  box-shadow: 0 0 0 4px rgba(40, 242, 156, 0.12);
+}
+
+.active-shift-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 20px;
+}
+
+.active-shift-head strong {
+  color: var(--profit);
+  font-size: clamp(42px, 8vw, 86px);
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.runner-actions {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.4fr) 1fr;
+  gap: 14px;
+}
+
+.ghost-button.danger {
+  color: #ff8aa0;
+  border-color: rgba(255, 95, 122, 0.28);
+}
+
 @media (max-width: 620px) {
   .empty-page {
     min-height: calc(100svh - 210px);
     padding: 30px 22px;
+  }
+
+  .platform-choice,
+  .runner-actions,
+  .active-shift-head {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-option,
+  .runner-field input {
+    min-height: 66px;
+    border-radius: 20px;
+  }
+
+  .active-shift-head strong {
+    font-size: clamp(42px, 16vw, 68px);
   }
 }
 
