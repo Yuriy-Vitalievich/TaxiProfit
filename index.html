@@ -94,11 +94,56 @@
       </aside>
 
       <main class="home-view view-panel active" data-view-panel="home">
-        <section class="panel empty-page">
-          <span class="section-kicker">Главная</span>
-          <h1>Главная</h1>
-          <p>Чистый экран для главного сценария. Начнем с простой смены и будем добавлять аналитику только после того, как логика станет понятной.</p>
-          <button class="submit-button shell-cta" type="button" data-view="start">Начать смену</button>
+        <section class="panel home-earnings-card" aria-label="Сегодня заработано">
+          <div class="home-earnings-head">
+            <div>
+              <span class="section-kicker">Сегодня</span>
+              <h1>Сегодня заработано</h1>
+            </div>
+            <button class="mini-action" type="button" data-view="start">Смена</button>
+          </div>
+
+          <div class="earnings-main">
+            <span>Грязными</span>
+            <strong id="todayGrossValue">₴ 0</strong>
+          </div>
+
+          <div class="earnings-details">
+            <div>
+              <span>Чистыми</span>
+              <strong id="todayNetValue">₴ 0</strong>
+            </div>
+            <div>
+              <span>До цели</span>
+              <strong id="goalLeftValue">₴ 0</strong>
+            </div>
+          </div>
+
+          <div class="goal-strip" aria-label="Прогресс до цели">
+            <div class="goal-strip-top">
+              <span>Цель дня</span>
+              <strong id="goalPercentValue">0%</strong>
+            </div>
+            <div class="goal-progress-track">
+              <span id="goalProgressBar" style="width: 0%"></span>
+            </div>
+          </div>
+
+          <div class="home-chart" aria-label="График заработка">
+            <div class="home-chart-head">
+              <span>Заработок по дням</span>
+              <strong>Неделя</strong>
+            </div>
+            <div class="home-chart-bars">
+              <span style="--bar: 18%"><i>Пн</i></span>
+              <span style="--bar: 34%"><i>Вт</i></span>
+              <span style="--bar: 22%"><i>Ср</i></span>
+              <span style="--bar: 48%"><i>Чт</i></span>
+              <span style="--bar: 28%"><i>Пт</i></span>
+              <span style="--bar: 62%"><i>Сб</i></span>
+              <span style="--bar: 0%"><i>Вс</i></span>
+            </div>
+          </div>
         </section>
       </main>
 
