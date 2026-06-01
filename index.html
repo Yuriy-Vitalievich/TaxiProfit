@@ -8,15 +8,116 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="TaxiProfit" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="description" content="TaxiProfit - мобильный cockpit для водителя такси." />
+    <meta name="description" content="TaxiProfit - мобильный cockpit для учета смен, расходов и прибыли водителя такси." />
     <title>TaxiProfit</title>
-    <link rel="manifest" href="manifest.webmanifest?v=telegram-mvp-1" />
+    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260527-4" />
     <link rel="icon" href="assets/icons/taxiprofit-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/icons/taxiprofit-icon.svg" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=telegram-mvp-1" />
+    <link rel="stylesheet" href="styles.css?v=telegram-20260527-4" />
   </head>
   <body>
+    <section class="onboarding-overlay" id="onboardingOverlay" hidden aria-label="Регистрация водителя">
+      <div class="onboarding-card">
+        <div class="onboarding-progress" aria-hidden="true">
+          <span id="onboardingProgress"></span>
+        </div>
+
+        <div class="onboarding-step active" data-onboarding-step="welcome">
+          <div class="onboarding-logo" aria-hidden="true">🚖</div>
+          <span class="section-kicker">TaxiProfit</span>
+          <h1>Настроим кабинет водителя</h1>
+          <p>Telegram ID уже привязан к приложению. Осталось указать авто, пробег и расход, чтобы TaxiProfit считал смены и аналитику под тебя.</p>
+          <button class="submit-button" type="button" id="onboardingStart">Создать профиль</button>
+        </div>
+
+        <div class="onboarding-step" data-onboarding-step="carType">
+          <span class="section-kicker">Шаг 1</span>
+          <h2>На каком авто вы работаете?</h2>
+          <div class="choice-grid" data-choice-group="carOwnership">
+            <button type="button" data-choice-value="own">Собственное авто</button>
+            <button type="button" data-choice-value="rent">Арендованное авто</button>
+            <button type="button" data-choice-value="fleet">Авто агрегатора / парка</button>
+          </div>
+        </div>
+
+        <div class="onboarding-step" data-onboarding-step="vehicle">
+          <span class="section-kicker">Шаг 2</span>
+          <h2>Данные авто</h2>
+          <div class="form-grid onboarding-form-grid">
+            <label>
+              Марка авто
+              <select name="carBrand" id="onboardingCarBrand"></select>
+            </label>
+            <label>
+              Модель
+              <select name="carModel" id="onboardingCarModel"></select>
+            </label>
+            <label>
+              Текущий пробег
+              <input name="odometer" type="number" min="0" step="0.1" placeholder="125430" />
+            </label>
+            <label>
+              Средний расход, л/100км
+              <input name="fuelConsumption" type="number" min="0" step="0.1" placeholder="6.5" />
+            </label>
+          </div>
+        </div>
+
+        <div class="onboarding-step" data-onboarding-step="rent">
+          <span class="section-kicker">Шаг 3</span>
+          <h2>Условия аренды</h2>
+          <p>Эти данные потом будут использоваться в аналитике прибыли.</p>
+          <div class="form-grid onboarding-form-grid">
+            <label>
+              Стоимость аренды, ₴
+              <input name="rentAmount" type="number" min="0" step="1" placeholder="6300" />
+            </label>
+            <label>
+              Частота оплаты
+              <select name="rentFrequency">
+                <option value="day">Сутки</option>
+                <option value="week">Неделя</option>
+                <option value="month">Месяц</option>
+              </select>
+            </label>
+            <label class="wide-field">
+              День оплаты аренды
+              <select name="rentPaymentDay">
+                <option value="daily">Каждый день</option>
+                <option value="monday">Понедельник</option>
+                <option value="tuesday">Вторник</option>
+                <option value="wednesday">Среда</option>
+                <option value="thursday">Четверг</option>
+                <option value="friday">Пятница</option>
+                <option value="saturday">Суббота</option>
+                <option value="sunday">Воскресенье</option>
+                <option value="month_1">1 число месяца</option>
+                <option value="month_15">15 число месяца</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="onboarding-step" data-onboarding-step="platforms">
+          <span class="section-kicker">Шаг 4</span>
+          <h2>С какими агрегаторами вы работаете?</h2>
+          <div class="choice-grid multi" data-choice-group="platforms">
+            <button type="button" data-choice-value="Bolt">Bolt</button>
+            <button type="button" data-choice-value="Uklon">Uklon</button>
+            <button type="button" data-choice-value="InDrive">InDrive</button>
+            <button type="button" data-choice-value="Uber">Uber</button>
+            <button type="button" data-choice-value="Другое">Другое</button>
+          </div>
+        </div>
+
+        <div class="onboarding-actions">
+          <button class="ghost-button" type="button" id="onboardingBack">Назад</button>
+          <button class="submit-button" type="button" id="onboardingNext">Далее</button>
+        </div>
+      </div>
+    </section>
+
     <div class="app-shell">
       <div class="pull-refresh" id="pullRefresh" aria-hidden="true">
         <span></span>
@@ -33,7 +134,7 @@
         </button>
 
         <div class="top-actions">
-          <button class="icon-button" type="button" aria-label="Настройки" id="settingsButton">⚙</button>
+          <button class="icon-button" type="button" aria-label="Настройки">⚙</button>
           <button class="profile-button" type="button" aria-label="Профиль" id="profileButton">АК</button>
         </div>
       </header>
@@ -50,24 +151,23 @@
           </div>
           <button class="menu-close" type="button" id="menuClose" aria-label="Закрыть меню">×</button>
         </div>
-
         <nav class="screen-tabs" aria-label="Разделы приложения">
           <div class="side-main-links">
             <a class="screen-tab side-primary active" href="#home" data-view="home">
               <span class="side-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" /></svg>
+                <svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/></svg>
               </span>
               <span>Главная</span>
             </a>
             <a class="screen-tab side-primary" href="#dashboard" data-view="dashboard">
               <span class="side-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M4 19V5" /><path d="M4 19h16" /><path d="M8 16v-5" /><path d="M12 16V8" /><path d="M16 16v-7" /></svg>
+                <svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16v-5"/><path d="M12 16V8"/><path d="M16 16v-7"/></svg>
               </span>
               <span>Статистика</span>
             </a>
             <a class="screen-tab side-primary" href="#start" data-view="start">
               <span class="side-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M6 12h12" /><path d="m13 7 5 5-5 5" /><path d="M5 5v14" /></svg>
+                <svg viewBox="0 0 24 24"><path d="M6 12h12"/><path d="m13 7 5 5-5 5"/><path d="M5 5v14"/></svg>
               </span>
               <span>Начать смену</span>
             </a>
@@ -80,7 +180,6 @@
             <a class="screen-tab side-secondary" href="#history" data-view="history">История</a>
           </div>
         </nav>
-
         <div class="side-user-card">
           <span class="side-user-avatar" id="sideUserAvatar" aria-hidden="true">АК</span>
           <span class="side-user-copy">
@@ -88,147 +187,713 @@
             <small id="sideUserSubtitle">Кабинет водителя</small>
           </span>
           <button class="side-user-settings" type="button" data-view="profile" aria-label="Открыть кабинет">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" /><path d="M19 13.5v-3l-2.1-.35a6.7 6.7 0 0 0-.68-1.64L17.45 6.8 15.3 4.65 13.6 5.88a6.7 6.7 0 0 0-1.6-.66L11.5 3h-3l-.35 2.1a6.7 6.7 0 0 0-1.64.68L4.8 4.55 2.65 6.7 3.88 8.4a6.7 6.7 0 0 0-.66 1.6L1 10.5v3l2.1.35c.16.58.39 1.13.68 1.64L2.55 17.2l2.15 2.15 1.7-1.23c.5.28 1.04.51 1.6.66l.5 2.22h3l.35-2.1c.58-.16 1.13-.39 1.64-.68l1.71 1.23 2.15-2.15-1.23-1.7c.28-.5.51-1.04.66-1.6z" /></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19 13.5v-3l-2.1-.35a6.7 6.7 0 0 0-.68-1.64L17.45 6.8 15.3 4.65 13.6 5.88a6.7 6.7 0 0 0-1.6-.66L11.5 3h-3l-.35 2.1a6.7 6.7 0 0 0-1.64.68L4.8 4.55 2.65 6.7 3.88 8.4a6.7 6.7 0 0 0-.66 1.6L1 10.5v3l2.1.35c.16.58.39 1.13.68 1.64L2.55 17.2l2.15 2.15 1.7-1.23c.5.28 1.04.51 1.6.66l.5 2.22h3l.35-2.1c.58-.16 1.13-.39 1.64-.68l1.71 1.23 2.15-2.15-1.23-1.7c.28-.5.51-1.04.66-1.6z"/></svg>
           </button>
         </div>
       </aside>
 
-      <main class="home-view view-panel active" data-view-panel="home">
-        <section class="panel home-earnings-card" aria-label="Сегодня заработано">
-          <div class="home-earnings-head">
-            <h1>Сегодня заработано</h1>
-            <strong id="todayTopValue">₴ 0</strong>
-          </div>
+      <div class="stats-period-controls hidden" id="statsPeriodControls" aria-label="Выбор периода статистики">
+        <div class="period-switch" role="group" aria-label="Быстрый период">
+          <button class="period active" type="button" data-period="day">День</button>
+          <button class="period" type="button" data-period="week">Неделя</button>
+          <button class="period" type="button" data-period="month">Месяц</button>
+          <button class="period" type="button" data-period="year">Год</button>
+        </div>
 
-          <div class="earnings-main">
-            <strong id="todayGrossValue">₴ 0</strong>
-            <span id="todayGrossHint">Сегодня заработка пока нет</span>
-          </div>
-
-          <div class="earnings-plain-list">
-            <span>Чистая прибыль сегодня</span>
-            <strong id="todayNetValue">₴ 0</strong>
-            <span>До недельной цели</span>
-            <strong id="goalLeftValue">₴ 10 000</strong>
-          </div>
-
-          <div class="home-chart" aria-label="График заработка">
-            <div class="home-chart-head">
-              <span>Доход за 7 дней</span>
-              <strong>Недостаточно данных для аналитики</strong>
-            </div>
-            <div class="home-chart-bars">
-              <span style="--bar: 0%"></span>
-              <span style="--bar: 0%"></span>
-              <span style="--bar: 0%"></span>
-              <span style="--bar: 0%"></span>
-              <span style="--bar: 0%"></span>
-              <span style="--bar: 0%"></span>
-              <span style="--bar: 0%"></span>
-            </div>
-            <div class="home-chart-footer">
-              <span>26.05</span>
-              <strong>Макс ₴0</strong>
-              <span>01.06</span>
+        <div class="period-navigator" aria-label="Навигация по периоду">
+          <button class="period-arrow" type="button" id="prevPeriod" aria-label="Предыдущий период">‹</button>
+          <div class="calendar-menu" id="calendarMenu">
+            <button class="period-current" type="button" id="periodLabel" aria-label="Открыть календарь" aria-expanded="false">Сегодня</button>
+            <div class="calendar-popover" id="calendarPopover" hidden>
+              <div class="calendar-popover-head">
+                <strong>Выбрать период</strong>
+                <span>быстро или диапазоном</span>
+              </div>
+              <div class="calendar-presets" aria-label="Быстрые периоды">
+                <button type="button" data-calendar-period="all">За все время</button>
+                <button type="button" data-calendar-period="today">Сегодня</button>
+                <button type="button" data-calendar-period="yesterday">Вчера</button>
+                <button type="button" data-calendar-period="prevWeek">Прошлая неделя</button>
+                <button type="button" data-calendar-period="prevMonth">Прошлый месяц</button>
+                <button type="button" data-calendar-period="prevYear">Прошлый год</button>
+              </div>
+              <div class="range-picker" id="rangePickerWrap" aria-label="Свой период">
+                <label>
+                  <span>Начало</span>
+                  <input id="rangeStart" type="date" />
+                </label>
+                <label>
+                  <span>Конец</span>
+                  <input id="rangeEnd" type="date" />
+                </label>
+              </div>
             </div>
           </div>
+          <button class="period-arrow" type="button" id="nextPeriod" aria-label="Следующий период">›</button>
+        </div>
+      </div>
+
+      <main class="start-shift-view view-panel" data-view-panel="start">
+        <section class="panel shift-runner" id="shiftRunner" aria-label="Начать смену">
+          <div class="shift-runner-state active" data-runner-state="idle">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker">Смена</span>
+                <h1>Начать смену</h1>
+              </div>
+            </div>
+            <div class="runner-platforms" aria-label="Выбор платформы">
+              <button class="active" type="button" data-run-platform="Bolt">Bolt</button>
+              <button type="button" data-run-platform="Uklon">Uklon</button>
+              <button type="button" data-run-platform="InDrive">InDrive</button>
+            </div>
+            <label class="runner-field">
+              Пробег на авто сейчас
+              <input id="startOdometer" type="number" min="0" step="0.1" inputmode="decimal" placeholder="125430.5" required />
+            </label>
+            <button class="submit-button runner-primary" type="button" id="startShiftButton">▶ Начать смену</button>
+          </div>
+
+          <div class="shift-runner-state" data-runner-state="active">
+            <div class="runner-active-head">
+              <div>
+                <span class="section-kicker">Активная смена</span>
+                <h1 id="activePlatform">Bolt</h1>
+                <p id="activeShiftMeta">Старт зафиксирован</p>
+              </div>
+              <strong id="activeTimer">00:00:00</strong>
+            </div>
+            <div class="runner-live-actions">
+              <button class="ghost-button runner-cancel" type="button" id="cancelActiveShiftButton">Отменить смену</button>
+              <button class="submit-button runner-stop" type="button" id="finishShiftButton">⏹ Завершить смену</button>
+            </div>
+          </div>
+
+          <form class="shift-runner-state runner-finish-form" data-runner-state="finish" id="finishShiftForm">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker">Итоги смены</span>
+                <h1 id="finishShiftTitle">Завершить смену</h1>
+                <p id="finishShiftMeta">00:00:00</p>
+              </div>
+            </div>
+            <div class="finish-grid">
+              <label>
+                Км по заказам
+                <input name="km" type="number" min="0" step="0.1" placeholder="89.4" required />
+              </label>
+              <label>
+                Пробег после смены
+                <input name="odometerEnd" type="number" min="0" step="0.1" placeholder="125520.0" required />
+              </label>
+              <label>
+                Количество заказов
+                <input name="orders" type="number" min="0" step="1" placeholder="18" required />
+              </label>
+              <label>
+                Выручка, ₴
+                <input name="gross" type="number" min="0" step="0.01" placeholder="3000" required />
+              </label>
+              <label>
+                Расходы, ₴
+                <input name="expenses" type="number" min="0" step="0.01" placeholder="0" />
+              </label>
+              <label class="wide-field">
+                Комментарий
+                <input name="comment" type="text" placeholder="заметка по смене" />
+              </label>
+            </div>
+            <div class="runner-actions">
+              <button class="ghost-button" type="button" id="cancelFinishShift">Назад</button>
+              <button class="submit-button" type="submit">Сохранить смену</button>
+            </div>
+          </form>
         </section>
+      </main>
 
-        <section class="panel weekly-plan-card" aria-label="Недельный план">
-          <div class="weekly-plan-head">
-            <h2>Недельный план</h2>
-            <strong id="weeklyPlanPercent">0%</strong>
+      <main class="home-view view-panel active" data-view-panel="home">
+        <section class="hero-grid" aria-label="Главные показатели">
+          <article class="glass-card kpi-card primary-kpi motivation-kpi">
+            <div class="primary-kpi-copy">
+              <div class="card-topline">
+                <span>Сегодня заработано</span>
+                <strong class="profit" id="homeProfitDelta">+0%</strong>
+              </div>
+              <div class="mega-value" id="homeNetProfit">₴ 0</div>
+              <p id="homeProfitFormula">Сравнение со вчерашним днем</p>
+              <div class="today-submetrics">
+                <div>
+                  <span>Чистая прибыль сегодня</span>
+                  <strong id="homeTodayNetValue">₴ 0</strong>
+                </div>
+                <div>
+                  <span>До недельной цели</span>
+                  <strong id="homeWeeklyGoalLeft">₴ 0</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="mini-bars" aria-label="Мини-график дохода за выбранный период">
+              <div class="mini-chart-head">
+                <span>Доход за 7 дней</span>
+                <strong id="homeBestDayLabel">Недостаточно данных</strong>
+              </div>
+              <div class="mini-bars-plot" id="homeMiniBars" aria-hidden="true">
+                <span style="height: 34%"></span>
+                <span style="height: 46%"></span>
+                <span style="height: 39%"></span>
+                <span style="height: 62%"></span>
+                <span class="best" style="height: 88%"></span>
+                <span style="height: 71%"></span>
+                <span style="height: 56%"></span>
+              </div>
+              <div class="mini-bars-caption">
+                <span id="homeMiniStartLabel">Пн</span>
+                <strong id="homeMiniMaxLabel">Макс ₴5 800</strong>
+                <span id="homeMiniEndLabel">Вс</span>
+              </div>
+            </div>
+          </article>
+
+          <div class="kpi-stack">
+            <article class="glass-card kpi-card shift-card plan-card">
+              <div class="card-topline">
+                <span>Недельный план</span>
+                <strong class="profit" id="homeGoalPercent">0%</strong>
+              </div>
+              <div class="kpi-value" id="homeWeekNet">₴ 0</div>
+              <div class="goal-track weekly-track" aria-label="Прогресс недельной цели">
+                <span id="homeGoalProgress"></span>
+              </div>
+              <p id="homeGoalText">из недельной цели</p>
+            </article>
+
+            <article class="glass-card kpi-card danger-card mileage-card forecast-kpi">
+              <div class="card-topline">
+                <span>Прогноз недели</span>
+                <strong id="homePaceLabel">темп</strong>
+              </div>
+              <div class="kpi-value" id="homeForecast">₴ 0</div>
+              <p id="homeForecastText">если продолжишь в таком темпе</p>
+            </article>
+
+            <article class="glass-card kpi-card orders-card">
+              <div class="card-topline">
+                <span>Ритм работы</span>
+                <strong id="homeWeekHours">0 ч</strong>
+              </div>
+              <div class="kpi-value" id="homeWeekOrders">0</div>
+              <p id="homeWeekOps">заказов на этой неделе</p>
+            </article>
           </div>
-          <div class="weekly-plan-value">₴ 0</div>
-          <div class="goal-progress-track">
-            <span id="goalProgressBar" style="width: 0%"></span>
-          </div>
-          <p>чистыми в неделю ₴ 0 / осталось ₴ 10 000</p>
+
+          <article class="glass-card assistant-panel average-card">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker ai">Средние показатели</span>
+                <h2>Качество недели</h2>
+              </div>
+            </div>
+            <div class="forecast-card">
+              <span>Средний доход в час</span>
+              <strong id="homeAvgHourValue">₴ 538</strong>
+              <p id="homeAvgHourText">выручка / часы онлайн</p>
+            </div>
+            <div class="insight-list">
+              <article class="insight-card hot">
+                <strong>Средний заказ</strong>
+                <p id="homeAvgOrderText">₴ 2 610 за смену</p>
+              </article>
+              <article class="insight-card warn">
+                <strong>Чистыми за неделю</strong>
+                <p id="homeWeekCleanText">₴ 2 072 за смену</p>
+              </article>
+              <article class="insight-card idea">
+                <strong>Часы и пробег</strong>
+                <p id="homeOpsText">15.6 заказов · 93.9 км за смену</p>
+              </article>
+              <article class="insight-card tariff">
+                <strong>Стоимость км</strong>
+                <p id="homeKmPriceText">₴ 0 за км</p>
+              </article>
+            </div>
+          </article>
+
         </section>
       </main>
 
       <main class="dashboard view-panel" data-view-panel="dashboard">
-        <section class="panel empty-page">
-          <span class="section-kicker">Статистика</span>
-          <h1>Статистика</h1>
-          <p>Страница очищена от старых графиков и расчетов. Новую аналитику будем собирать постепенно.</p>
-        </section>
-      </main>
-
-      <main class="start-shift-view view-panel" data-view-panel="start">
-        <section class="panel shift-runner" id="shiftRunner">
-          <div class="runner-state active" data-runner-state="idle">
-            <span class="section-kicker">Смена</span>
-            <h1>Где сегодня работаешь?</h1>
-            <div class="platform-choice" role="group" aria-label="Выбор агрегатора">
-              <button class="platform-option active" type="button" data-platform="Bolt">Bolt</button>
-              <button class="platform-option" type="button" data-platform="Uklon">Uklon</button>
-              <button class="platform-option" type="button" data-platform="InDrive">InDrive</button>
-            </div>
-            <label class="runner-field">
-              <span>Пробег на старте</span>
-              <input id="startMileageInput" type="number" inputmode="decimal" min="0" step="0.1" placeholder="Например 125430" />
-            </label>
-            <button class="submit-button" type="button" id="startShiftButton">Начать смену</button>
-          </div>
-
-          <div class="runner-state" data-runner-state="active">
-            <span class="section-kicker">Активная смена</span>
-            <div class="active-shift-head">
-              <div>
-                <h1 id="activeShiftPlatform">Bolt</h1>
-                <p id="activeShiftMeta">Старт смены</p>
+        <section class="hero-grid" aria-label="Главные показатели">
+          <article class="glass-card kpi-card primary-kpi">
+            <div class="primary-kpi-copy">
+              <div class="card-topline">
+                <span>Чистая прибыль</span>
+                <strong class="profit" id="profitDelta">+12%</strong>
               </div>
-              <strong id="activeShiftTimer">00:00:00</strong>
+              <div class="mega-value" id="netProfit">₴ 42 580</div>
+              <p id="profitFormula">Выручка минус расходы за выбранный период</p>
             </div>
-            <div class="runner-actions">
-              <button class="ghost-button danger" type="button" id="cancelShiftButton">Отменить</button>
-              <button class="submit-button" type="button" id="finishShiftButton">Завершить смену</button>
+
+            <div class="mini-bars" aria-label="Мини-график дохода за выбранный период">
+              <div class="mini-chart-head">
+                <span>Доход по дням</span>
+                <strong id="bestDayLabel">Лучший доход: 9 мая</strong>
+              </div>
+              <div class="mini-bars-plot" id="miniBars" aria-hidden="true">
+                <span style="height: 34%"></span>
+                <span style="height: 46%"></span>
+                <span style="height: 39%"></span>
+                <span style="height: 62%"></span>
+                <span class="best" style="height: 88%"></span>
+                <span style="height: 71%"></span>
+                <span style="height: 56%"></span>
+              </div>
+              <div class="mini-bars-caption">
+                <span id="miniStartLabel">Пн</span>
+                <strong id="miniMaxLabel">Макс ₴5 800</strong>
+                <span id="miniEndLabel">Вс</span>
+              </div>
             </div>
+          </article>
+
+          <div class="kpi-stack">
+            <article class="glass-card kpi-card shift-card">
+              <div class="card-topline">
+                <span>Смен отработано</span>
+                <strong class="profit" id="hourDelta">↑</strong>
+              </div>
+              <div class="kpi-value" id="shiftCount">18</div>
+              <p id="avgProfitText">Средняя прибыль за смену</p>
+            </article>
+
+            <article class="glass-card kpi-card danger-card mileage-card">
+              <div class="card-topline">
+                <span>Пробег итого</span>
+                <strong class="loss" id="fuelDelta">+14%</strong>
+              </div>
+              <div class="kpi-value" id="mileageTotal">1 689 км</div>
+              <p id="avgMileageText">Средний пробег за смену</p>
+            </article>
+
+            <article class="glass-card kpi-card orders-card">
+              <div class="card-topline">
+                <span>Заказов всего</span>
+                <strong id="onlineBadge">86 ч</strong>
+              </div>
+              <div class="kpi-value" id="orderCount">281</div>
+              <p id="avgOrdersText">Среднее кол-во заказов за смену</p>
+            </article>
           </div>
 
-          <div class="runner-state" data-runner-state="finished">
-            <span class="section-kicker">Финиш</span>
-            <h1>Смена завершена</h1>
-            <p id="finishedShiftMeta">Данные финиша добавим следующим шагом.</p>
-            <button class="submit-button" type="button" id="newShiftButton">Начать новую смену</button>
-          </div>
+          <article class="glass-card assistant-panel average-card">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker ai">Средние показатели</span>
+                <h2>За смену</h2>
+              </div>
+            </div>
+            <div class="forecast-card">
+              <span>Средняя прибыль</span>
+              <strong id="avgProfitValue">₴ 538</strong>
+              <p id="avgRevenueExpenseText">Выручка и расходы за смену</p>
+            </div>
+            <div class="insight-list">
+              <article class="insight-card hot">
+                <strong>Средняя выручка</strong>
+                <p id="avgRevenueText">₴ 2 610 за смену</p>
+              </article>
+              <article class="insight-card warn">
+                <strong>Средние расходы</strong>
+                <p id="avgExpenseText">₴ 2 072 за смену</p>
+              </article>
+              <article class="insight-card idea">
+                <strong>Пробег и заказы</strong>
+                <p id="avgOpsText">15.6 заказов · 93.9 км за смену</p>
+              </article>
+              <article class="insight-card tariff">
+                <strong>Стоимость км</strong>
+                <p id="avgKmPriceText">₴ 0 за км</p>
+              </article>
+            </div>
+          </article>
+        </section>
+
+        <div id="incomeChart" hidden></div>
+
+        <section class="analytics-grid">
+          <article class="panel heatmap-panel">
+            <div class="section-head">
+              <div>
+                <span class="section-kicker">Killer feature</span>
+                <h2>Heatmap заработка</h2>
+              </div>
+              <span class="muted">день × час</span>
+            </div>
+            <div class="heatmap" id="heatmap" aria-label="Тепловая карта заработка"></div>
+            <div class="heat-legend">
+              <span>меньше денег</span>
+              <i></i><i></i><i></i><i></i>
+              <span>пик</span>
+            </div>
+          </article>
+
+          <article class="panel expense-panel">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker">Расходы</span>
+                <h2>Куда ушли деньги</h2>
+              </div>
+            </div>
+            <div class="donut-wrap">
+              <div class="donut" aria-label="Круговая диаграмма расходов"></div>
+              <div class="donut-center">
+                <span>Всего</span>
+                <strong id="totalExpenses">₴ 19 870</strong>
+              </div>
+            </div>
+            <ul class="expense-list">
+              <li><span class="dot fuel"></span>Топливо <strong id="fuelExpense">₴ 9 240</strong></li>
+              <li><span class="dot rent"></span>Аренда <strong id="rentExpense">₴ 5 800</strong></li>
+              <li><span class="dot wash"></span>Мойка <strong id="washExpense">₴ 1 230</strong></li>
+              <li><span class="dot fine"></span>Штраф <strong id="fineExpense">₴ 0</strong></li>
+              <li><span class="dot repair"></span>Ремонт <strong id="repairExpense">₴ 0</strong></li>
+              <li><span class="dot fee"></span>Прочее <strong id="otherExpense">₴ 0</strong></li>
+            </ul>
+          </article>
         </section>
       </main>
 
       <main class="archive-view view-panel" data-view-panel="archive">
-        <section class="panel empty-page">
-          <span class="section-kicker">Архив</span>
-          <h1>Архив</h1>
-          <p>Пустая страница для будущего календаря и истории смен.</p>
+        <section class="panel archive-panel">
+          <div class="section-head">
+            <div>
+              <span class="section-kicker">Архив</span>
+              <h2>Календарь и смены</h2>
+            </div>
+            <div class="archive-actions">
+              <span class="muted" id="daysSummary">0 рабочих · 0 выходных</span>
+              <button class="ghost-button" type="button">Экспорт</button>
+            </div>
+          </div>
+
+          <div class="archive-layout">
+            <div class="archive-calendar">
+              <div class="archive-subhead">
+                <strong>Рабочие и выходные дни</strong>
+                <span>по выбранному периоду</span>
+              </div>
+              <div class="days-grid" id="daysGrid" aria-label="Календарь рабочих и выходных дней"></div>
+            </div>
+
+            <div class="archive-shifts">
+              <div class="archive-subhead">
+                <strong>Последние смены</strong>
+                <span>касса, чистыми и эффективность</span>
+              </div>
+              <div class="shift-table" id="shiftTable" aria-label="Последние смены">
+                <div class="table-row table-head">
+                  <span>Дата</span>
+                  <span>Статус</span>
+                  <span>Касса</span>
+                  <span>Чистыми</span>
+                  <span>Эффективность</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
       </main>
 
       <main class="data-entry view-panel" data-view-panel="data">
-        <section class="panel empty-page">
-          <span class="section-kicker">Данные</span>
-          <h1>Данные</h1>
-          <p>Формы ввода убраны. Новый ввод смен и расходов добавим только после утверждения логики.</p>
+        <section class="data-grid">
+          <form class="panel shift-form" id="shiftForm">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker" id="shiftFormKicker">Новая смена</span>
+                <h2 id="shiftFormTitle">Добавить данные</h2>
+              </div>
+              <div class="form-actions">
+                <button class="ghost-button" type="button" id="cancelShiftEdit" hidden>Отмена</button>
+              </div>
+            </div>
+
+            <div class="quick-shift-form">
+              <div class="shift-time-row wide-field">
+                <label>
+                  Дата
+                  <input class="app-picker-native" name="date" type="date" required />
+                  <button class="app-picker-button" type="button" data-picker="date" data-picker-target="shiftForm.date" aria-label="Выбрать дату смены">
+                    <span data-picker-label>Дата</span>
+                    <i aria-hidden="true">▣</i>
+                  </button>
+                </label>
+                <label>
+                  Старт
+                  <input class="app-picker-native" name="start" type="time" value="17:30" aria-label="Вышел на линию" required />
+                  <button class="app-picker-button" type="button" data-picker="time" data-picker-target="shiftForm.start" aria-label="Выбрать время старта">
+                    <span data-picker-label>17:30</span>
+                    <i aria-hidden="true">◷</i>
+                  </button>
+                </label>
+                <label>
+                  Финиш
+                  <input class="app-picker-native" name="end" type="time" value="23:30" aria-label="Выбрать время финиша" required />
+                  <button class="app-picker-button" type="button" data-picker="time" data-picker-target="shiftForm.end" aria-label="Выбрать время финиша">
+                    <span data-picker-label>23:30</span>
+                    <i aria-hidden="true">◷</i>
+                  </button>
+                </label>
+              </div>
+
+              <div class="platform-field wide-field">
+                <span>Где заработал</span>
+                <div class="platform-options" role="radiogroup" aria-label="Платформа выручки">
+                  <label>
+                    <input type="radio" name="platform" value="Uklon" checked />
+                    <span>Uklon</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="platform" value="Bolt" />
+                    <span>Bolt</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="platform" value="Indrive" />
+                    <span>Indrive</span>
+                  </label>
+                </div>
+              </div>
+
+              <label>
+                Выручка, ₴
+                <input name="grossAmount" type="number" min="0" step="0.01" placeholder="3000" required />
+              </label>
+              <label>
+                Пробег, км
+                <input name="km" type="number" min="0" step="0.1" placeholder="89.4" required />
+              </label>
+
+              <div class="shift-auto-summary wide-field" aria-live="polite">
+                <div>
+                  <span>Часы онлайн</span>
+                  <strong id="shiftHoursPreview">6 ч</strong>
+                </div>
+                <div>
+                  <span>Касса итого</span>
+                  <strong id="shiftGrossPreview">₴ 0</strong>
+                </div>
+              </div>
+            </div>
+
+            <button class="submit-button" type="submit" id="shiftSubmit">Добавить смену</button>
+          </form>
+
+          <form class="panel shift-form expense-entry-form" id="expenseForm">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker" id="expenseFormKicker">Журнал расходов</span>
+                <h2 id="expenseFormTitle">Добавить расход</h2>
+              </div>
+              <button class="ghost-button" type="button" id="cancelExpenseEdit" hidden>Отмена</button>
+            </div>
+
+            <div class="form-grid expense-quick-grid">
+              <label>
+                Дата
+                <input class="app-picker-native" name="date" type="date" required />
+                <button class="app-picker-button" type="button" data-picker="date" data-picker-target="expenseForm.date" aria-label="Выбрать дату расхода">
+                  <span data-picker-label>Дата</span>
+                  <i aria-hidden="true">▣</i>
+                </button>
+              </label>
+              <label>
+                Категория
+                <select class="app-picker-native" name="category">
+                  <option>Аренда авто</option>
+                  <option>Топливо</option>
+                  <option>Мойка</option>
+                  <option>Штраф</option>
+                  <option>Комиссии</option>
+                  <option>Прочие</option>
+                </select>
+                <button class="app-picker-button" type="button" data-picker="select" data-picker-target="expenseForm.category" aria-label="Выбрать категорию расхода">
+                  <span data-picker-label>Аренда авто</span>
+                  <i aria-hidden="true">⌄</i>
+                </button>
+              </label>
+              <label>
+                Сумма, ₴
+                <input name="amount" type="number" min="0" step="0.01" placeholder="2700" required />
+              </label>
+              <label class="wide-field">
+                Комментарий
+                <input name="comment" type="text" placeholder="Например: полный бак, мойка, аренда" />
+              </label>
+            </div>
+
+            <button class="submit-button" type="submit" id="expenseSubmit">Добавить расход</button>
+          </form>
+        </section>
+
+        <section class="panel data-intro compact-info">
+          <div>
+            <span class="section-kicker ai">Источник данных</span>
+            <h2>Supabase</h2>
+            <p id="syncStatus">Проверяем облако и realtime...</p>
+          </div>
+          <span class="data-source-badge">Realtime</span>
         </section>
       </main>
 
       <main class="history-view view-panel" data-view-panel="history">
-        <section class="panel empty-page">
-          <span class="section-kicker">История</span>
-          <h1>История</h1>
-          <p>Пустой журнал. Записи появятся после того, как заново соберем сохранение смен.</p>
+        <section class="history-grid">
+          <section class="panel raw-data-panel">
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker">Синхронизация</span>
+                <h2>Google Sheets CSV</h2>
+              </div>
+              <button class="ghost-button danger" type="button" id="clearData">Очистить</button>
+            </div>
+            <div class="sync-panel">
+              <p>Скачай CSV из Google Sheets и загрузи сюда: отдельно лист со сменами и отдельно лист “Расходы”.</p>
+              <div class="sync-actions">
+                <button class="ghost-button" type="button" id="importShiftsButton">Импорт смен</button>
+                <button class="ghost-button" type="button" id="importExpensesButton">Импорт расходов</button>
+              </div>
+              <p class="sync-status" id="csvSyncStatus">Импорт еще не выполнялся.</p>
+            </div>
+            <input class="file-input" id="csvImport" type="file" accept=".csv,text/csv" />
+            <input class="file-input" id="expenseImport" type="file" accept=".csv,text/csv" />
+            <div class="section-head tight raw-list-head">
+              <div>
+                <span class="section-kicker">База</span>
+                <h2>Введенные смены</h2>
+              </div>
+            </div>
+            <div class="raw-list" id="rawShiftList"></div>
+          </section>
         </section>
       </main>
 
       <main class="profile-view view-panel" data-view-panel="profile">
-        <section class="panel empty-page">
-          <span class="section-kicker">Кабинет</span>
-          <h1>Кабинет водителя</h1>
-          <p>Кабинет очищен. Здесь заново соберем профиль водителя, авто и настройки.</p>
+        <section class="panel profile-panel">
+          <div class="section-head tight">
+            <div>
+              <span class="section-kicker">Кабинет</span>
+              <h1>Профиль водителя</h1>
+            </div>
+          </div>
+
+          <article class="profile-summary-card" id="profileSummaryCard">
+            <div class="profile-summary-head">
+              <div>
+                <span class="profile-card-label">Аккаунт зарегистрирован</span>
+                <strong id="profileDriverLabel">Водитель</strong>
+                <p id="profileCarLabel">Авто не указано</p>
+              </div>
+            </div>
+            <div class="profile-facts-grid">
+              <div>
+                <span>Пробег</span>
+                <strong id="profileOdometerLabel">— км</strong>
+              </div>
+              <div>
+                <span>Расход топлива</span>
+                <strong id="profileFuelLabel">— л/100 км</strong>
+              </div>
+            </div>
+            <button class="ghost-button profile-edit-button" type="button" id="editProfileButton">Редактировать</button>
+          </article>
+
+          <form class="profile-settings-form" id="profileForm" hidden>
+            <div class="section-head tight">
+              <div>
+                <span class="section-kicker ai">Данные водителя</span>
+                <h2>Рабочий профиль</h2>
+              </div>
+            </div>
+
+            <article class="panel goal-panel profile-goal-panel">
+              <div class="section-head tight">
+                <div>
+                  <span class="section-kicker">Цель недели</span>
+                  <label class="goal-control">
+                    <span>₴</span>
+                    <input id="goalInput" name="weeklyGoal" type="number" min="1" step="500" value="10000" aria-label="Цель недели" />
+                  </label>
+                </div>
+                <strong class="goal-percent" id="goalPercent">61%</strong>
+              </div>
+              <div class="goal-track" aria-label="Прогресс цели">
+                <span id="goalProgress"></span>
+              </div>
+              <p id="goalText">Осталось ₴ 0. Если продолжишь в таком темпе, неделя будет закрыта выше плана.</p>
+            </article>
+
+            <div class="form-grid profile-form-grid">
+              <label>
+                Имя водителя
+                <input name="driverName" type="text" autocomplete="name" placeholder="Юрий" />
+              </label>
+              <label>
+                Марка авто
+                <input name="carBrand" type="text" placeholder="Toyota" />
+              </label>
+              <label>
+                Модель
+                <input name="carModel" type="text" placeholder="Prius" />
+              </label>
+              <label>
+                Пробег, км
+                <input name="odometer" type="number" min="0" step="0.1" inputmode="decimal" placeholder="125430.5" />
+              </label>
+              <label>
+                Расход топлива, л/100 км
+                <input name="fuelConsumption" type="number" min="0" step="0.1" inputmode="decimal" placeholder="6.5" />
+              </label>
+            </div>
+
+            <div class="profile-form-actions">
+              <button class="ghost-button" type="button" id="cancelProfileEdit">Отмена</button>
+              <button class="submit-button" type="submit" id="saveProfileButton">Сохранить кабинет</button>
+            </div>
+            <p class="profile-note" id="profileSaveStatus">Профиль будет храниться в Supabase и использоваться для привязки данных к пользователю.</p>
+          </form>
+
+          <div class="profile-grid profile-system-grid">
+            <article class="profile-card auth-card compact-profile-card">
+              <span class="profile-card-label">Аккаунт</span>
+              <strong id="authStatusTitle">Синхронизация включена</strong>
+              <p id="authStatusText">Данные сохраняются в Supabase и синхронизируются между устройствами.</p>
+            </article>
+
+            <div class="profile-card auth-form compact-profile-card">
+              <span class="profile-card-label">Сессия</span>
+              <strong id="profileSessionLabel">Telegram ID</strong>
+              <p id="profileSessionText">Кабинет водителя</p>
+              <div class="profile-danger-actions">
+                <button class="ghost-button" type="button" id="signOutButton">Выйти</button>
+                <button class="ghost-button danger" type="button" id="deleteProfileButton">Удалить профиль</button>
+              </div>
+            </div>
+          </div>
         </section>
       </main>
     </div>
 
-    <script src="app.js?v=telegram-mvp-1"></script>
+    <div class="app-picker-sheet" id="appPickerSheet" hidden aria-modal="true" role="dialog" aria-label="Выбор значения">
+      <button class="app-picker-backdrop" type="button" data-picker-close aria-label="Закрыть выбор"></button>
+      <div class="app-picker-panel">
+        <div class="app-picker-handle" aria-hidden="true"></div>
+        <div class="app-picker-head">
+          <strong id="appPickerTitle">Выбор</strong>
+          <button type="button" data-picker-close aria-label="Закрыть">×</button>
+        </div>
+        <div class="app-picker-body" id="appPickerBody"></div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js?v=telegram-20260527-4"></script>
   </body>
 </html>
