@@ -27,6 +27,7 @@ const CAR_YEAR_START = 1995;
 const SUPABASE_URL = "https://aqogfuzhjqbsanaovcox.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HHwwAnF8AfI0IW1CdlROtg_sOjD-Wl_";
 const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
+const SUPABASE_REQUEST_TIMEOUT = 12000;
 const GOOGLE_SHEETS_WEB_APP_URL = "";
 const REALTIME_REFRESH_DELAY = 500;
 const telegramApp = window.Telegram?.WebApp || null;
@@ -1583,16 +1584,30 @@ async function nextOnboardingStep() {
 
 async function cloudRequest(path, options = {}) {
   const { method = "GET", body, query = "", prefer = "return=representation" } = options;
-  const response = await fetch(`${SUPABASE_REST_URL}/${path}${query}`, {
-    method,
-    headers: {
-      apikey: SUPABASE_PUBLISHABLE_KEY,
-      Authorization: `Bearer ${getAuthToken()}`,
-      "Content-Type": "application/json",
-      Prefer: prefer,
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), SUPABASE_REQUEST_TIMEOUT);
+
+  let response;
+  try {
+    response = await fetch(`${SUPABASE_REST_URL}/${path}${query}`, {
+      method,
+      headers: {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${getAuthToken()}`,
+        "Content-Type": "application/json",
+        Prefer: prefer,
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error("Supabase request timeout");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     const message = await response.text();
