@@ -1126,6 +1126,13 @@ async function signInAnonymously() {
   }
 }
 
+async function ensureProfileSaveSession() {
+  if (currentUser) return true;
+  if (!hasRealtimeClient()) return false;
+  if (elements.profileSaveStatus) elements.profileSaveStatus.textContent = "Создаем сессию для сохранения профиля...";
+  return signInAnonymously();
+}
+
 function profileFromSupabase(row = {}) {
   return normalizeProfile({
     userId: row.user_id || getCurrentUserId() || "",
@@ -1250,6 +1257,10 @@ async function saveUserProfile(profile) {
   renderProfile("Профиль сохранен. Синхронизируем с Supabase...");
   renderOnboarding();
 
+  if (!getCurrentUserId()) {
+    await ensureProfileSaveSession();
+  }
+
   if (!hasCloudStorage() || !getCurrentUserId()) {
     renderProfile("Профиль сохранен локально.");
     renderOnboarding();
@@ -1273,17 +1284,13 @@ async function saveUserProfile(profile) {
       console.warn("Profile RPC save unavailable, using REST fallback.", rpcError);
     }
 
-    const updated = await cloudRequest("profiles", {
-      method: "PATCH",
-      query: `?user_id=eq.${encodeURIComponent(ownerUserId)}`,
+    const [savedProfileRow] = await cloudRequest("profiles", {
+      method: "POST",
+      query: "?on_conflict=user_id",
+      prefer: "resolution=merge-duplicates,return=representation",
       body: { ...payload, user_id: ownerUserId },
     });
-    if (Array.isArray(updated) && !updated.length) {
-      await cloudRequest("profiles", {
-        method: "POST",
-        body: { ...payload, user_id: ownerUserId },
-      });
-    }
+    if (savedProfileRow) saveLocalProfile(profileFromSupabase(savedProfileRow));
     renderProfile("Профиль сохранен в Supabase.");
     renderOnboarding();
     return true;
