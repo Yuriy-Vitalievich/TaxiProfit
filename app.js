@@ -950,7 +950,7 @@ function getTelegramId() {
 }
 
 function getCloudOwnerUserId() {
-  return getCurrentUserId() || userProfile.userId || null;
+  return currentUser?.id || null;
 }
 
 function getCloudOwnerTelegramId() {
@@ -1040,24 +1040,26 @@ async function initializeAuth() {
     const { data } = await client.auth.getSession();
     currentSession = data?.session || null;
     currentUser = currentSession?.user || null;
+    authReady = true;
 
-    if (!currentUser) {
-      await signInAnonymously();
-    } else {
-      authReady = true;
-      await syncTelegramAuthMetadata();
-      await ensureUserProfile();
-      renderProfile();
-      updateAccessFlow();
+    if (currentUser?.is_anonymous) {
+      await client.auth.signOut();
+      currentSession = null;
+      currentUser = null;
     }
-    return Boolean(currentUser);
+
+    if (currentUser) await syncTelegramAuthMetadata();
+    await ensureUserProfile();
+    renderProfile();
+    updateAccessFlow();
+    return Boolean(getTelegramId());
   } catch (error) {
     authReady = true;
     renderProfile();
     updateAccessFlow();
-    setSyncStatus("Auth не подключился. Проверь настройки Supabase Auth.");
+    setSyncStatus("Telegram ID подключен. Supabase Auth не нужен для регистрации.");
     console.warn("Supabase Auth unavailable.", error);
-    return false;
+    return Boolean(getTelegramId());
   }
 }
 
@@ -1092,50 +1094,13 @@ async function syncTelegramAuthMetadata() {
   }
 }
 
-async function signInAnonymously() {
-  const client = createAuthClient();
-  if (!client) return false;
-
-  try {
-    const telegram = telegramProfilePayload();
-    const { data, error } = await client.auth.signInAnonymously({
-      options: {
-        data: {
-          telegram_id: telegram.telegram_id ? String(telegram.telegram_id) : "",
-          telegram_username: telegram.telegram_username || "",
-          display_name: telegram.display_name || "",
-          avatar_url: telegram.avatar_url || "",
-        },
-      },
-    });
-    if (error) throw error;
-    currentSession = data?.session || null;
-    currentUser = data?.user || currentSession?.user || null;
-    authReady = true;
-    await ensureUserProfile();
-    renderProfile();
-    updateAccessFlow();
-    return Boolean(currentUser);
-  } catch (error) {
-    authReady = true;
-    renderProfile();
-    updateAccessFlow();
-    setSyncStatus("Включи Anonymous sign-ins в Supabase Auth или войди через email.");
-    console.warn("Anonymous auth unavailable.", error);
-    return false;
-  }
-}
-
 async function ensureProfileSaveSession() {
-  if (currentUser) return true;
-  if (!hasRealtimeClient()) return false;
-  if (elements.profileSaveStatus) elements.profileSaveStatus.textContent = "Создаем сессию для сохранения профиля...";
-  return signInAnonymously();
+  return Boolean(getTelegramId());
 }
 
 function profileFromSupabase(row = {}) {
   return normalizeProfile({
-    userId: row.user_id || getCurrentUserId() || "",
+    userId: row.user_id || row.id || getCurrentUserId() || "",
     telegramId: row.telegram_id || "",
     telegramUsername: row.telegram_username || "",
     displayName: row.display_name || "",
@@ -1164,7 +1129,6 @@ function profileFromSupabase(row = {}) {
 function profileToSupabasePayload(profile = userProfile) {
   const telegram = telegramProfilePayload();
   return {
-    user_id: getCurrentUserId(),
     telegram_id: telegram.telegram_id || Number(profile.telegramId || 0) || null,
     telegram_username: telegram.telegram_username || profile.telegramUsername || "",
     display_name: profile.displayName || profile.driverName || telegram.display_name || "",
@@ -1191,7 +1155,7 @@ function profileToSupabasePayload(profile = userProfile) {
 }
 
 async function ensureUserProfile() {
-  if (!hasCloudStorage() || !getCurrentUserId()) return false;
+  if (!hasCloudStorage() || !getTelegramId()) return false;
   if (isProfileDeletedLocally()) {
     userProfile = {};
     writeStorage(JSON.stringify(userProfile), PROFILE_STORAGE_KEY);
@@ -1203,28 +1167,25 @@ async function ensureUserProfile() {
 
   try {
     const telegramId = getTelegramId();
-    const [currentUserRow] = await cloudRequest("profiles", {
-      query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&select=*&limit=1`,
-    });
-    let telegramRow = null;
+    let row = null;
 
-    if (telegramId) {
-      [telegramRow] = await cloudRequest("profiles", {
+    try {
+      [row] = await cloudRequest("drivers", {
+        query: `?telegram_id=eq.${encodeURIComponent(telegramId)}&select=*&limit=1`,
+      });
+    } catch (driverError) {
+      console.warn("Drivers table is unavailable, trying legacy profiles.", driverError);
+    }
+
+    if (!row) {
+      const [telegramRow] = await cloudRequest("profiles", {
         query: `?telegram_id=eq.${encodeURIComponent(telegramId)}&select=*&order=updated_at.desc&limit=1`,
       });
+      row = telegramRow || null;
     }
-
-    let row = currentUserRow;
-    if (!currentUserRow?.onboarding_completed && telegramRow?.onboarding_completed) {
-      row = telegramRow;
-    }
-    if (!row && telegramRow) row = telegramRow;
 
     if (row) {
       saveLocalProfile(profileFromSupabase(row));
-      if (row !== currentUserRow && row.onboarding_completed) {
-        await saveUserProfile({ ...userProfile, userId: getCurrentUserId(), onboardingCompleted: true });
-      }
       if (userProfile.defaultPlatform) selectedRunnerPlatform = userProfile.defaultPlatform;
       if (Number(userProfile.weeklyGoal) > 0) saveWeeklyGoal(Number(userProfile.weeklyGoal));
       renderProfile();
@@ -1257,21 +1218,17 @@ async function saveUserProfile(profile) {
   renderProfile("Профиль сохранен. Синхронизируем с Supabase...");
   renderOnboarding();
 
-  if (!getCurrentUserId()) {
-    await ensureProfileSaveSession();
-  }
-
-  if (!hasCloudStorage() || !getCurrentUserId()) {
+  const telegramId = getTelegramId();
+  if (!hasCloudStorage() || !telegramId) {
     renderProfile("Профиль сохранен локально.");
     renderOnboarding();
     return false;
   }
 
   try {
-    const ownerUserId = getCurrentUserId();
     const payload = profileToSupabasePayload(profile);
     try {
-      const savedProfile = await cloudRequest("rpc/upsert_current_telegram_profile", {
+      const savedProfile = await cloudRequest("rpc/upsert_telegram_driver_profile", {
         method: "POST",
         body: { profile_payload: payload },
       });
@@ -1281,14 +1238,14 @@ async function saveUserProfile(profile) {
       renderOnboarding();
       return true;
     } catch (rpcError) {
-      console.warn("Profile RPC save unavailable, using REST fallback.", rpcError);
+      console.warn("Telegram profile RPC save unavailable, using REST fallback.", rpcError);
     }
 
-    const [savedProfileRow] = await cloudRequest("profiles", {
+    const [savedProfileRow] = await cloudRequest("drivers", {
       method: "POST",
-      query: "?on_conflict=user_id",
+      query: "?on_conflict=telegram_id",
       prefer: "resolution=merge-duplicates,return=representation",
-      body: { ...payload, user_id: ownerUserId },
+      body: payload,
     });
     if (savedProfileRow) saveLocalProfile(profileFromSupabase(savedProfileRow));
     renderProfile("Профиль сохранен в Supabase.");
@@ -1304,11 +1261,12 @@ async function saveUserProfile(profile) {
 
 async function deleteCloudProfile() {
   if (!hasCloudStorage() || !requireCloudUser()) return false;
+  const telegramId = getTelegramId();
 
   try {
-    await cloudRequest("rpc/delete_current_telegram_profile_data", {
+    await cloudRequest("rpc/delete_telegram_driver_account", {
       method: "POST",
-      body: {},
+      body: { target_telegram_id: telegramId },
       prefer: "return=minimal",
     });
     return true;
@@ -1319,42 +1277,12 @@ async function deleteCloudProfile() {
   try {
     const ownerQuery = cloudOwnerQuery();
     const deleteQuery = ownerQuery ? `?${ownerQuery}` : "";
-    const resetPayload = {
-      driver_name: "",
-      car_ownership: "",
-      car_brand: "",
-      car_model: "",
-      car_year: null,
-      fuel_type: "",
-      fuel_consumption: null,
-      odometer: null,
-      car_number: "",
-      default_platform: "",
-      rent_amount: null,
-      rent_frequency: "",
-      rent_payment_day: "",
-      platforms: [],
-      phone: "",
-      city: "",
-      weekly_goal: DEFAULT_WEEKLY_GOAL,
-      onboarding_completed: false,
-    };
-    await cloudRequest("profiles", {
-      method: "PATCH",
-      query: deleteQuery,
-      body: resetPayload,
-      prefer: "return=minimal",
-    });
     await Promise.all([
+      cloudRequest("drivers", { method: "DELETE", query: deleteQuery, prefer: "return=minimal" }),
       cloudRequest("shifts", { method: "DELETE", query: deleteQuery, prefer: "return=minimal" }),
       cloudRequest("expenses", { method: "DELETE", query: deleteQuery, prefer: "return=minimal" }),
       cloudRequest("settings", { method: "DELETE", query: deleteQuery, prefer: "return=minimal" }),
     ]);
-    await cloudRequest("profiles", {
-      method: "DELETE",
-      query: deleteQuery,
-      prefer: "return=minimal",
-    });
     return true;
   } catch (error) {
     console.warn("Profile delete fallback used.", error);
@@ -1368,9 +1296,9 @@ async function clearCloudActivity() {
   if (!requireCloudUser()) return false;
 
   try {
-    await cloudRequest("rpc/clear_current_telegram_activity", {
+    await cloudRequest("rpc/clear_telegram_activity", {
       method: "POST",
-      body: {},
+      body: { target_telegram_id: getTelegramId() },
       prefer: "return=minimal",
     });
     return true;
@@ -1416,7 +1344,7 @@ function renderProfile(message = "") {
   const profile = { ...userProfile };
   const initials = telegramUser ? initialsFromTelegramUser(telegramUser) : initialsFromTelegramUser({ username: profile.driverName || profile.displayName || "TP" });
   const displayName = profile.driverName || profile.displayName || telegram.display_name || "TaxiProfit";
-  const subtitle = telegram.telegram_username ? `@${telegram.telegram_username}` : currentUser?.email || "Кабинет водителя";
+  const subtitle = telegram.telegram_username ? `@${telegram.telegram_username}` : "Кабинет водителя";
 
   if (elements.profileButton) elements.profileButton.textContent = initials;
   if (elements.sideUserAvatar) {
@@ -1429,7 +1357,7 @@ function renderProfile(message = "") {
   if (elements.sideUserName) elements.sideUserName.textContent = displayName;
   if (elements.sideUserSubtitle) elements.sideUserSubtitle.textContent = subtitle;
   if (elements.profileTelegramId) elements.profileTelegramId.textContent = telegram.telegram_id || profile.telegramId || "не передан";
-  if (elements.profileSupabaseId) elements.profileSupabaseId.textContent = currentUser?.id ? `${currentUser.id.slice(0, 8)}...` : "нет входа";
+  if (elements.profileSupabaseId) elements.profileSupabaseId.textContent = telegram.telegram_id || profile.telegramId || "нет Telegram ID";
   if (elements.profileDriverLabel) elements.profileDriverLabel.textContent = displayName;
   if (elements.profileCarLabel) {
     const carTitle = [profile.carBrand, profile.carModel, profile.carYear].filter(Boolean).join(" ");
@@ -1456,21 +1384,17 @@ function renderProfile(message = "") {
   }
 
   if (elements.authStatusTitle) {
-    const hasDriverProfile = Boolean(profile.userId || profile.onboardingCompleted);
-    elements.authStatusTitle.textContent = currentUser
-      ? currentUser.is_anonymous
-        ? "Синхронизация включена"
-        : "Supabase подключен"
-      : hasDriverProfile
-        ? "Локальный профиль"
+    const hasDriverProfile = Boolean(profile.telegramId || profile.onboardingCompleted);
+    elements.authStatusTitle.textContent = hasDriverProfile
+      ? "Аккаунт Telegram подключен"
       : authReady
-        ? "Сессия не активна"
-        : "Проверяем вход...";
+        ? "Ожидаем регистрацию"
+        : "Проверяем Telegram ID...";
   }
   if (elements.authStatusText) {
-    elements.authStatusText.textContent = currentUser || profile.userId || profile.onboardingCompleted
-      ? "Смены, расходы и настройки сохраняются в твоем аккаунте."
-      : "Профиль будет создан автоматически при первом запуске.";
+    elements.authStatusText.textContent = profile.telegramId || profile.onboardingCompleted
+      ? "Смены, расходы и настройки сохраняются в Supabase по твоему Telegram ID."
+      : "После регистрации будет создан один личный аккаунт водителя.";
   }
   if (elements.profileForm) elements.profileForm.hidden = !isProfileEditing;
   if (elements.editProfileButton) elements.editProfileButton.textContent = isProfileEditing ? "Закрыть" : "Редактировать";
@@ -1492,7 +1416,7 @@ function currentOnboardingStep() {
 }
 
 function shouldShowOnboarding() {
-  return authReady && Boolean(currentUser) && !userProfile.onboardingCompleted;
+  return authReady && Boolean(getTelegramId()) && !userProfile.onboardingCompleted;
 }
 
 function setOnboardingOpen(isOpen) {
@@ -1609,9 +1533,12 @@ function validateOnboardingStep() {
 async function finishOnboarding() {
   readOnboardingInputs();
   const platforms = onboardingDraft.platforms?.length ? onboardingDraft.platforms : ["Bolt"];
+  const telegram = telegramProfilePayload();
   const nextProfile = {
     ...userProfile,
     ...onboardingDraft,
+    telegramId: telegram.telegram_id || userProfile.telegramId || "",
+    telegramUsername: telegram.telegram_username || userProfile.telegramUsername || "",
     carOwnership: onboardingDraft.carOwnership || userProfile.carOwnership || "own",
     driverName: onboardingDraft.driverName || userProfile.driverName || telegramDisplayName() || "",
     displayName: userProfile.displayName || telegramDisplayName() || onboardingDraft.driverName || "",
@@ -3736,9 +3663,12 @@ elements.profileButton?.addEventListener("click", () => {
 });
 
 elements.authStartButton?.addEventListener("click", async () => {
-  if (elements.authMessage) elements.authMessage.textContent = "Создаем безопасную сессию...";
-  const ok = await signInAnonymously();
-  if (ok && elements.authMessage) elements.authMessage.textContent = "Готово. Теперь заполни профиль водителя.";
+  if (elements.authMessage) {
+    elements.authMessage.textContent = getTelegramId()
+      ? "Telegram ID получен. Заполни профиль водителя."
+      : "Открой приложение внутри Telegram, чтобы получить Telegram ID.";
+  }
+  renderOnboarding();
 });
 
 elements.authForm?.addEventListener("submit", async (event) => {
@@ -3771,8 +3701,7 @@ elements.authForm?.addEventListener("submit", async (event) => {
 
 elements.signOutButton?.addEventListener("click", async () => {
   const client = createAuthClient();
-  if (!client) return;
-  await client.auth.signOut();
+  if (client) await client.auth.signOut();
   currentSession = null;
   currentUser = null;
   userProfile = {};
