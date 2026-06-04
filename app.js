@@ -1006,93 +1006,17 @@ function createAuthClient() {
     },
   });
 
-  authClient.auth.onAuthStateChange(async (_event, session) => {
-    currentSession = session;
-    currentUser = session?.user || null;
-    authReady = true;
-    renderProfile();
-    updateAccessFlow();
-    if (currentUser) {
-      await syncTelegramAuthMetadata();
-      const profileReady = await ensureUserProfile();
-      if (profileReady && hasCompletedDriverProfile()) {
-        await loadCloudData({ applyEmpty: true, silent: true });
-        await loadCloudSettings();
-        setupRealtimeSync({ includeSettings: true });
-      }
-      renderAll();
-    }
-  });
-
   return authClient;
 }
 
 async function initializeAuth() {
-  const client = createAuthClient();
-  if (!client) {
-    authReady = true;
-    renderProfile();
-    updateAccessFlow();
-    setSyncStatus("Supabase Auth недоступен: работаем локально.");
-    return false;
-  }
-
-  try {
-    const { data } = await client.auth.getSession();
-    currentSession = data?.session || null;
-    currentUser = currentSession?.user || null;
-    authReady = true;
-
-    if (currentUser?.is_anonymous) {
-      await client.auth.signOut();
-      currentSession = null;
-      currentUser = null;
-    }
-
-    if (currentUser) await syncTelegramAuthMetadata();
-    await ensureUserProfile();
-    renderProfile();
-    updateAccessFlow();
-    return Boolean(getTelegramId());
-  } catch (error) {
-    authReady = true;
-    renderProfile();
-    updateAccessFlow();
-    setSyncStatus("Telegram ID подключен. Supabase Auth не нужен для регистрации.");
-    console.warn("Supabase Auth unavailable.", error);
-    return Boolean(getTelegramId());
-  }
-}
-
-async function syncTelegramAuthMetadata() {
-  const client = createAuthClient();
-  const telegram = telegramProfilePayload();
-  if (!client || !currentUser || !telegram.telegram_id) return false;
-
-  const metadata = currentUser.user_metadata || {};
-  if (String(metadata.telegram_id || "") === String(telegram.telegram_id)) return true;
-
-  try {
-    const { data, error } = await client.auth.updateUser({
-      data: {
-        telegram_id: String(telegram.telegram_id),
-        telegram_username: telegram.telegram_username || "",
-        display_name: telegram.display_name || "",
-        avatar_url: telegram.avatar_url || "",
-      },
-    });
-    if (error) throw error;
-    currentUser = data?.user || currentUser;
-    const refreshed = await client.auth.refreshSession();
-    if (refreshed?.data?.session) {
-      currentSession = refreshed.data.session;
-      currentUser = currentSession.user;
-    }
-    return true;
-  } catch (error) {
-    console.warn("Could not sync Telegram metadata with Supabase Auth.", error);
-    return false;
-  }
+  currentSession = null;
+  currentUser = null;
+  authReady = true;
+  await ensureUserProfile();
+  renderProfile();
+  updateAccessFlow();
+  return Boolean(getTelegramId());
 }
 
 async function ensureProfileSaveSession() {
@@ -1208,7 +1132,8 @@ async function ensureUserProfile() {
   }
 }
 
-async function saveUserProfile(profile) {
+async function saveUserProfile(profile, options = {}) {
+  const { requireCloud = false } = options;
   if (profile?.onboardingCompleted) clearProfileDeletedMarker();
   saveLocalProfile(profile);
   if (profile.defaultPlatform) selectedRunnerPlatform = profile.defaultPlatform;
@@ -1221,7 +1146,13 @@ async function saveUserProfile(profile) {
 
   const telegramId = getTelegramId();
   if (!hasCloudStorage() || !telegramId) {
-    renderProfile("Профиль сохранен локально.");
+    const message = telegramId
+      ? "Профиль сохранен локально: Supabase недоступен."
+      : "Не удалось получить Telegram ID. Открой приложение внутри Telegram.";
+    if (requireCloud && profile?.onboardingCompleted) {
+      saveLocalProfile({ ...profile, onboardingCompleted: false });
+    }
+    renderProfile(message);
     renderOnboarding();
     return false;
   }
@@ -1254,7 +1185,11 @@ async function saveUserProfile(profile) {
     return true;
   } catch (error) {
     console.warn("Profile was saved locally but not synced.", error);
-    renderProfile("Профиль сохранен локально, Supabase пока не принял изменения.");
+    if (requireCloud && profile?.onboardingCompleted) {
+      saveLocalProfile({ ...profile, onboardingCompleted: false });
+    }
+    const errorMessage = String(error?.message || error || "неизвестная ошибка");
+    renderProfile(`Supabase не сохранил профиль: ${errorMessage.slice(0, 180)}`);
     renderOnboarding();
     return false;
   }
@@ -1535,6 +1470,14 @@ async function finishOnboarding() {
   readOnboardingInputs();
   const platforms = onboardingDraft.platforms?.length ? onboardingDraft.platforms : ["Bolt"];
   const telegram = telegramProfilePayload();
+  if (!telegram.telegram_id && !userProfile.telegramId) {
+    if (elements.profileSaveStatus) {
+      elements.profileSaveStatus.textContent = "Не удалось получить Telegram ID. Открой приложение внутри Telegram.";
+    }
+    renderProfile("Не удалось получить Telegram ID. Открой приложение внутри Telegram.");
+    return;
+  }
+
   const nextProfile = {
     ...userProfile,
     ...onboardingDraft,
@@ -1547,16 +1490,21 @@ async function finishOnboarding() {
     defaultPlatform: userProfile.defaultPlatform || platforms[0],
     onboardingCompleted: true,
   };
+
+  renderProfile("Создаем профиль водителя в Supabase...");
+  const saved = await saveUserProfile(nextProfile, { requireCloud: true });
+  if (!saved) {
+    onboardingStepIndex = onboardingSequence().indexOf("platforms");
+    renderOnboarding();
+    return;
+  }
+
   clearProfileDeletedMarker();
-  saveLocalProfile(nextProfile);
   if (Number(nextProfile.weeklyGoal) > 0) saveWeeklyGoal(Number(nextProfile.weeklyGoal));
   clearOnboardingDraft();
-  renderProfile("Регистрация завершена. Профиль сохранен.");
-  renderOnboarding();
+  renderProfile("Регистрация завершена. Профиль сохранен в Supabase.");
   setView("home");
   history.replaceState(null, "", "#home");
-  renderAll();
-  await saveUserProfile(nextProfile);
   renderAll();
 }
 
