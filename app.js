@@ -273,6 +273,7 @@ let currentSession = null;
 let currentUser = null;
 let userProfile = loadLocalProfile();
 let isProfileEditing = false;
+let lastProfileEditToggle = 0;
 let authReady = false;
 let onboardingStepIndex = 0;
 let onboardingDraft = loadOnboardingDraft();
@@ -3817,11 +3818,43 @@ elements.profileForm?.addEventListener("submit", async (event) => {
 
 bindActionButton(elements.saveProfileButton, submitProfileForm);
 
-bindActionButton(elements.editProfileButton, () => {
+function toggleProfileEditing(options = {}) {
+  const now = Date.now();
+  if (now - lastProfileEditToggle < 420) return;
+  lastProfileEditToggle = now;
   isProfileEditing = !isProfileEditing;
   fillProfileForm();
   renderProfile();
-});
+  if (isProfileEditing && options.scroll !== false) {
+    window.setTimeout(() => {
+      elements.profileForm?.scrollIntoView({ behavior: "smooth", block: "start" });
+      elements.profileForm?.querySelector("input, select, textarea")?.focus({ preventScroll: true });
+    }, 80);
+  }
+}
+
+bindActionButton(elements.editProfileButton, () => toggleProfileEditing());
+
+document.addEventListener(
+  "touchend",
+  (event) => {
+    const button = event.target.closest?.("[data-profile-edit]");
+    if (!button) return;
+    event.preventDefault();
+    toggleProfileEditing();
+  },
+  { passive: false, capture: true },
+);
+
+document.addEventListener(
+  "click",
+  (event) => {
+    const button = event.target.closest?.("[data-profile-edit]");
+    if (!button) return;
+    toggleProfileEditing();
+  },
+  { capture: true },
+);
 
 bindActionButton(elements.cancelProfileEdit, () => {
   isProfileEditing = false;
