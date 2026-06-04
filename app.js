@@ -117,7 +117,7 @@ const elements = {
   activeShiftMeta: document.querySelector("#activeShiftMeta"),
   finishShiftTitle: document.querySelector("#finishShiftTitle"),
   finishShiftMeta: document.querySelector("#finishShiftMeta"),
-  homeNetProfit: document.querySelector("#homeNetProfit"),
+  homeGrossRevenue: document.querySelector("#homeGrossRevenue"),
   homeProfitFormula: document.querySelector("#homeProfitFormula"),
   homeProfitDelta: document.querySelector("#homeProfitDelta"),
   homeTodayNetValue: document.querySelector("#homeTodayNetValue"),
@@ -1624,7 +1624,7 @@ async function finishOnboarding() {
   renderAll();
 }
 
-function nextOnboardingStep() {
+async function nextOnboardingStep() {
   readOnboardingInputs();
   if (currentOnboardingStep() === "carType" && !onboardingDraft.carOwnership) {
     onboardingDraft.carOwnership = "own";
@@ -1638,7 +1638,7 @@ function nextOnboardingStep() {
 
   const sequence = onboardingSequence();
   if (currentOnboardingStep() === "platforms") {
-    finishOnboarding();
+    await finishOnboarding();
     return;
   }
   onboardingStepIndex = Math.min(onboardingStepIndex + 1, sequence.length - 1);
@@ -2808,7 +2808,7 @@ function renderHomeMetrics() {
   const qualityOk = cleanKmPrice >= 25;
   const paceLabel = goalPace.forecast >= goalPace.goal ? "выше плана" : "ниже плана";
 
-  elements.homeNetProfit.textContent = money(todaySummary.gross);
+  elements.homeGrossRevenue.textContent = money(todaySummary.gross);
   elements.homeProfitFormula.textContent = yesterdaySummary.gross || todaySummary.gross
     ? `${signedMoney(todayDifference)} ${todayDifference >= 0 ? "больше" : "меньше"} чем вчера`
     : "Сегодня заработка пока нет";
@@ -3777,13 +3777,13 @@ elements.signOutButton?.addEventListener("click", async () => {
 
 function bindActionButton(element, handler) {
   if (!element) return;
-  let lastRun = 0;
+  let isRunning = false;
   const run = async (event) => {
     event?.preventDefault?.();
     event?.stopPropagation?.();
-    const now = Date.now();
-    if (now - lastRun < 360) return;
-    lastRun = now;
+    if (isRunning) return;
+    isRunning = true;
+    element.setAttribute("aria-busy", "true");
     try {
       await handler(event);
     } catch (error) {
@@ -3792,19 +3792,21 @@ function bindActionButton(element, handler) {
       if (elements.profileSaveStatus) elements.profileSaveStatus.textContent = message;
       if (elements.authMessage) elements.authMessage.textContent = message;
       setSyncStatus(message);
+    } finally {
+      isRunning = false;
+      element.removeAttribute("aria-busy");
     }
   };
   element.addEventListener("click", run);
-  element.addEventListener("pointerup", run);
-  element.addEventListener("touchend", run, { passive: false });
 }
 
 async function submitProfileForm() {
+  const nextProfile = readProfileForm();
+  saveLocalProfile(nextProfile);
   isProfileEditing = false;
-  saveLocalProfile(readProfileForm());
-  renderProfile("Профиль сохранен.");
+  renderProfile("Профиль сохранен на устройстве. Синхронизируем...");
   renderAll();
-  await saveUserProfile(userProfile);
+  await saveUserProfile(nextProfile);
   renderAll();
 }
 
@@ -3813,9 +3815,7 @@ elements.profileForm?.addEventListener("submit", async (event) => {
   await submitProfileForm();
 });
 
-bindActionButton(elements.saveProfileButton, () => {
-  submitProfileForm();
-});
+bindActionButton(elements.saveProfileButton, submitProfileForm);
 
 bindActionButton(elements.editProfileButton, () => {
   isProfileEditing = !isProfileEditing;
@@ -3865,9 +3865,7 @@ bindActionButton(elements.onboardingBack, () => {
   renderOnboarding();
 });
 
-bindActionButton(elements.onboardingNext, () => {
-  nextOnboardingStep();
-});
+bindActionButton(elements.onboardingNext, nextOnboardingStep);
 
 elements.onboardingCarBrand?.addEventListener("change", () => {
   onboardingDraft.carBrand = elements.onboardingCarBrand.value;
@@ -4146,17 +4144,8 @@ elements.finishShiftForm?.addEventListener("submit", async (event) => {
     return;
   }
 
-  let nextShift = runnerShiftFromForm(formData);
-  nextShift = await saveShiftToCloud(nextShift);
+  const nextShift = runnerShiftFromForm(formData);
   shifts.push(nextShift);
-  await sendToGoogleSheet("shift", nextShift);
-  if (Number(nextShift.odometerEnd || 0) > 0) {
-    userProfile = { ...userProfile, odometer: Number(nextShift.odometerEnd).toFixed(1) };
-    writeStorage(JSON.stringify(userProfile), PROFILE_STORAGE_KEY);
-    fillProfileForm();
-    await saveUserProfile(userProfile);
-  }
-
   saveShifts();
   clearActiveShift();
   pendingShiftFinish = null;
@@ -4164,6 +4153,20 @@ elements.finishShiftForm?.addEventListener("submit", async (event) => {
   periodAnchorDate = new Date(`${selectedDay}T12:00`);
   if (elements.dayPicker) elements.dayPicker.value = selectedDay;
   renderShiftRunner();
+  renderAll();
+
+  const localShiftIndex = shifts.length - 1;
+  const syncedShift = await saveShiftToCloud(nextShift);
+  shifts[localShiftIndex] = syncedShift;
+  saveShifts();
+  await sendToGoogleSheet("shift", syncedShift);
+  if (Number(nextShift.odometerEnd || 0) > 0) {
+    userProfile = { ...userProfile, odometer: Number(nextShift.odometerEnd).toFixed(1) };
+    writeStorage(JSON.stringify(userProfile), PROFILE_STORAGE_KEY);
+    fillProfileForm();
+    await saveUserProfile(userProfile);
+  }
+
   renderAll();
 });
 

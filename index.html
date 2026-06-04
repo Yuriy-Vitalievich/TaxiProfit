@@ -10,11 +10,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="TaxiProfit - мобильный cockpit для учета смен, расходов и прибыли водителя такси." />
     <title>TaxiProfit</title>
-    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260527-4" />
+    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260605-1" />
     <link rel="icon" href="assets/icons/taxiprofit-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/icons/taxiprofit-icon.svg" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=telegram-20260527-4" />
+    <link rel="stylesheet" href="styles.css?v=telegram-20260605-1" />
   </head>
   <body>
     <section class="onboarding-overlay" id="onboardingOverlay" hidden aria-label="Регистрация водителя">
@@ -316,14 +316,14 @@
           <article class="glass-card kpi-card primary-kpi motivation-kpi">
             <div class="primary-kpi-copy">
               <div class="card-topline">
-                <span>Сегодня заработано</span>
+                <span>Общая касса сегодня</span>
                 <strong class="profit" id="homeProfitDelta">+0%</strong>
               </div>
-              <div class="mega-value" id="homeNetProfit">₴ 0</div>
+              <div class="mega-value" id="homeGrossRevenue">₴ 0</div>
               <p id="homeProfitFormula">Сравнение со вчерашним днем</p>
               <div class="today-submetrics">
                 <div>
-                  <span>Чистая прибыль сегодня</span>
+                  <span>Чистыми сегодня</span>
                   <strong id="homeTodayNetValue">₴ 0</strong>
                 </div>
                 <div>
@@ -894,6 +894,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=telegram-20260527-4"></script>
+    <script src="app.js?v=telegram-20260605-1"></script>
   </body>
 </html>
