@@ -886,3 +886,9 @@ $$;
 grant execute on function public.upsert_telegram_driver_profile(jsonb) to anon, authenticated;
 grant execute on function public.delete_telegram_driver_account(bigint) to anon, authenticated;
 grant execute on function public.clear_telegram_activity(bigint) to anon, authenticated;
+
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.drivers to anon, authenticated;
+grant select, insert, update, delete on public.shifts to anon, authenticated;
+grant select, insert, update, delete on public.expenses to anon, authenticated;
+grant select, insert, update, delete on public.settings to anon, authenticated;
