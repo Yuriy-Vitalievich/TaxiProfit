@@ -117,7 +117,7 @@ const elements = {
   activeShiftMeta: document.querySelector("#activeShiftMeta"),
   finishShiftTitle: document.querySelector("#finishShiftTitle"),
   finishShiftMeta: document.querySelector("#finishShiftMeta"),
-  homeNetProfit: document.querySelector("#homeNetProfit"),
+  homeGrossRevenue: document.querySelector("#homeGrossRevenue"),
   homeProfitFormula: document.querySelector("#homeProfitFormula"),
   homeProfitDelta: document.querySelector("#homeProfitDelta"),
   homeTodayNetValue: document.querySelector("#homeTodayNetValue"),
@@ -2808,7 +2808,7 @@ function renderHomeMetrics() {
   const qualityOk = cleanKmPrice >= 25;
   const paceLabel = goalPace.forecast >= goalPace.goal ? "выше плана" : "ниже плана";
 
-  elements.homeNetProfit.textContent = money(todaySummary.gross);
+  elements.homeGrossRevenue.textContent = money(todaySummary.gross);
   elements.homeProfitFormula.textContent = yesterdaySummary.gross || todaySummary.gross
     ? `${signedMoney(todayDifference)} ${todayDifference >= 0 ? "больше" : "меньше"} чем вчера`
     : "Сегодня заработка пока нет";
