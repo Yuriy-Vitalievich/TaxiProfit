@@ -1142,7 +1142,7 @@ function profileFromSupabase(row = {}) {
     city: row.city || "",
     avatarUrl: row.avatar_url || "",
     weeklyGoal: Number(row.weekly_goal || weeklyGoal || DEFAULT_WEEKLY_GOAL),
-    onboardingCompleted: Boolean(row.onboarding_completed),
+    onboardingCompleted: Boolean(row.onboarding_completed ?? row.onboardingCompleted),
   });
 }
 
