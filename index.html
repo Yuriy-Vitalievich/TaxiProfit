@@ -10,13 +10,38 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="TaxiProfit - мобильный cockpit для учета смен, расходов и прибыли водителя такси." />
     <title>TaxiProfit</title>
-    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260605-6" />
+    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260605-7" />
     <link rel="icon" href="assets/icons/taxiprofit-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/icons/taxiprofit-icon.svg" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=telegram-20260605-6" />
+    <link rel="stylesheet" href="styles.css?v=telegram-20260605-7" />
   </head>
   <body>
+    <section class="auth-overlay" id="authOverlay" hidden aria-label="Вход в TaxiProfit">
+      <div class="auth-gate-card">
+        <div class="onboarding-logo" aria-hidden="true">🚖</div>
+        <span class="section-kicker">TaxiProfit</span>
+        <h1>Вход водителя</h1>
+        <p>Создай личный аккаунт Supabase или войди в существующий. Все смены, расходы и кабинет будут храниться только в твоем аккаунте.</p>
+        <form class="auth-form-fields" id="authForm">
+          <label>
+            Email
+            <input name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+          </label>
+          <label>
+            Пароль
+            <input name="password" type="password" autocomplete="current-password" minlength="6" placeholder="минимум 6 символов" required />
+          </label>
+          <div class="auth-actions">
+            <button class="submit-button" type="submit" name="intent" value="signup">Создать аккаунт</button>
+            <button class="ghost-button" type="submit" name="intent" value="signin">Войти</button>
+          </div>
+        </form>
+        <button class="ghost-button" type="button" id="authStartButton">Проверить вход</button>
+        <p class="profile-note" id="authMessage">Сначала создай аккаунт или войди, затем заполни кабинет водителя.</p>
+      </div>
+    </section>
+
     <section class="onboarding-overlay" id="onboardingOverlay" hidden aria-label="Регистрация водителя">
       <div class="onboarding-card">
         <div class="onboarding-progress" aria-hidden="true">
@@ -27,7 +52,7 @@
           <div class="onboarding-logo" aria-hidden="true">🚖</div>
           <span class="section-kicker">TaxiProfit</span>
           <h1>Настроим кабинет водителя</h1>
-          <p>Telegram ID уже привязан к приложению. Осталось указать авто, пробег и расход, чтобы TaxiProfit считал смены и аналитику под тебя.</p>
+          <p>Аккаунт создан. Осталось указать авто, пробег и расход, чтобы TaxiProfit считал смены и аналитику под тебя.</p>
           <button class="submit-button" type="button" id="onboardingStart">Создать профиль</button>
         </div>
 
@@ -894,6 +919,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=telegram-20260605-6"></script>
+    <script src="app.js?v=telegram-20260605-7"></script>
   </body>
 </html>
