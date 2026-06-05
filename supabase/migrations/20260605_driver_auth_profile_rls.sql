@@ -53,6 +53,10 @@ alter table public.shifts add column if not exists auth_user_id uuid references 
 alter table public.expenses add column if not exists auth_user_id uuid references auth.users(id) on delete set null;
 alter table public.settings add column if not exists auth_user_id uuid references auth.users(id) on delete set null;
 
+drop index if exists public.settings_legacy_key_unique;
+drop index if exists public.settings_user_key_unique;
+drop index if exists public.settings_telegram_key_unique;
+
 do $$
 declare
   item record;
