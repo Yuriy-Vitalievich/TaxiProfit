@@ -3218,17 +3218,27 @@ h2 {
 .shift-table {
   display: grid;
   gap: 8px;
-  overflow-x: auto;
+  overflow: hidden;
 }
 
 .table-row {
   display: grid;
-  grid-template-columns: 0.8fr 0.8fr minmax(190px, 1.4fr) 0.8fr 0.8fr 0.8fr;
-  min-width: 820px;
+  grid-template-columns: minmax(72px, 0.72fr) minmax(96px, 0.78fr) minmax(180px, 1.55fr) minmax(92px, 0.74fr) minmax(104px, 0.82fr) minmax(64px, 0.52fr);
+  min-width: 0;
   padding: 13px 14px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.045);
   color: var(--muted);
+  gap: 10px;
+  align-items: center;
+}
+
+.table-row > span,
+.table-row > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .table-row strong {
@@ -3238,7 +3248,7 @@ h2 {
 .table-head {
   background: transparent;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 900;
   text-transform: uppercase;
 }
