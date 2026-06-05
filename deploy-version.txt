@@ -43,3 +43,5 @@ TaxiProfit archive period filters and auto days off
 2026-06-06T00:35:00Z
 TaxiProfit archive compact period controls
 2026-06-06T00:45:00Z
+TaxiProfit page title header
+2026-06-06T01:05:00Z

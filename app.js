@@ -79,6 +79,15 @@ const seedExpenses = [
 const weekdayLabels = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const heatRows = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const heatHours = ["00", "08", "12", "16", "20"];
+const viewTitles = {
+  home: { title: "Главная", subtitle: "TaxiProfit" },
+  dashboard: { title: "Статистика", subtitle: "аналитика дохода" },
+  start: { title: "Начать смену", subtitle: "онлайн и пробег" },
+  archive: { title: "Архив", subtitle: "смены и выходные" },
+  data: { title: "Данные", subtitle: "смены и расходы" },
+  history: { title: "История", subtitle: "журнал записей" },
+  profile: { title: "Кабинет", subtitle: "профиль водителя" },
+};
 
 const elements = {
   incomeChart: document.querySelector("#incomeChart"),
@@ -99,6 +108,8 @@ const elements = {
   viewButtons: document.querySelectorAll("[data-view]"),
   viewPanels: document.querySelectorAll("[data-view-panel]"),
   menuToggle: document.querySelector("#menuToggle"),
+  pageTitle: document.querySelector("#pageTitle"),
+  pageSubtitle: document.querySelector("#pageSubtitle"),
   menuClose: document.querySelector("#menuClose"),
   menuOverlay: document.querySelector("#menuOverlay"),
   sideMenu: document.querySelector("#sideMenu"),
@@ -3947,6 +3958,13 @@ elements.viewButtons.forEach((button) => {
 });
 
 elements.menuToggle?.addEventListener("click", () => {
+  const currentView = document.querySelector(".view-panel.active")?.dataset.viewPanel || "home";
+  if (currentView !== "home") {
+    setView("home");
+    history.replaceState(null, "", "#home");
+    return;
+  }
+
   setSideMenuOpen(!elements.sideMenu?.classList.contains("open"));
 });
 
@@ -4277,8 +4295,13 @@ elements.onboardingChoiceButtons.forEach((button) => {
 
 function setView(view) {
   const nextView = ["dashboard", "start", "archive", "data", "history", "profile"].includes(view) ? view : "home";
+  const page = viewTitles[nextView] || viewTitles.home;
   elements.viewButtons.forEach((item) => item.classList.toggle("active", item.dataset.view === nextView));
   elements.viewPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.viewPanel === nextView));
+  if (elements.pageTitle) elements.pageTitle.textContent = page.title;
+  if (elements.pageSubtitle) elements.pageSubtitle.textContent = page.subtitle;
+  elements.menuToggle?.classList.toggle("is-back", nextView !== "home");
+  elements.menuToggle?.setAttribute("aria-label", nextView === "home" ? "Открыть меню" : "Назад на главную");
   const hasPeriodControls = ["dashboard", "archive"].includes(nextView);
   elements.statsPeriodControls?.classList.toggle("hidden", !hasPeriodControls);
   elements.statsPeriodControls?.classList.toggle("archive-mode", nextView === "archive");

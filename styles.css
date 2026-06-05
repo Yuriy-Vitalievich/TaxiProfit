@@ -398,7 +398,7 @@ a {
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: 10px;
+  gap: 12px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -407,6 +407,40 @@ a {
   font: inherit;
   text-decoration: none;
   text-align: left;
+}
+
+.brand-nav-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.045));
+  color: var(--text);
+  font-size: 1.15rem;
+  font-weight: 950;
+  line-height: 1;
+  box-shadow: 0 0 28px rgba(40, 242, 156, 0.1);
+}
+
+.brand-nav-icon::before {
+  content: "☰";
+}
+
+.brand.is-back .brand-nav-icon {
+  font-size: 1.55rem;
+}
+
+.brand.is-back .brand-nav-icon::before {
+  content: "‹";
+}
+
+.page-heading {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
 }
 
 .brand-mark {
@@ -424,6 +458,10 @@ a {
 .brand strong,
 .brand small {
   display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .brand strong {
@@ -3419,6 +3457,17 @@ h2 {
     height: 38px;
     flex-basis: 38px;
     border-radius: 12px;
+  }
+
+  .brand-nav-icon {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+    border-radius: 12px;
+  }
+
+  .brand strong {
+    font-size: 1rem;
   }
 
   .period-switch {
