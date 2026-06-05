@@ -402,6 +402,7 @@ function normalizeProfile(profile = {}) {
     avatarUrl: profile.avatarUrl || profile.avatar_url || "",
     weeklyGoal: profileNumber(profile.weeklyGoal, profile.weekly_goal, weeklyGoal, DEFAULT_WEEKLY_GOAL),
     onboardingCompleted: Boolean(profile.onboardingCompleted ?? profile.onboarding_completed),
+    createdAt: profile.createdAt || profile.created_at || "",
   };
 }
 
@@ -1143,6 +1144,7 @@ function profileFromSupabase(row = {}) {
     avatarUrl: row.avatar_url || "",
     weeklyGoal: Number(row.weekly_goal || weeklyGoal || DEFAULT_WEEKLY_GOAL),
     onboardingCompleted: Boolean(row.onboarding_completed ?? row.onboardingCompleted),
+    createdAt: row.created_at || row.createdAt || "",
   });
 }
 
@@ -3254,22 +3256,48 @@ function addDays(value, days) {
   return next;
 }
 
+function dateFromKey(value, endOfDate = false) {
+  if (!value) return null;
+  const key = String(value).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
+  return new Date(`${key}T${endOfDate ? "23:59:59.999" : "00:00:00"}`);
+}
+
+function maxDate(...values) {
+  return values.filter(Boolean).reduce((latest, value) => (!latest || value > latest ? value : latest), null);
+}
+
+function minDate(...values) {
+  return values.filter(Boolean).reduce((earliest, value) => (!earliest || value < earliest ? value : earliest), null);
+}
+
+function profileCreatedDate() {
+  return dateFromKey(userProfile.createdAt || userProfile.created_at || "", false);
+}
+
 function calendarBounds(period, source) {
   const dates = source.map((shift) => shift.date).filter(Boolean).sort();
-  if (!dates.length) return period === "all" ? null : periodBounds(period);
+  const todayStart = dateFromKey(dateKey(new Date()), false);
+  const todayEnd = todayValue();
+  const firstProfileDay = profileCreatedDate();
 
   if (period !== "all") {
     const bounds = periodBounds(period);
-    const latestSourceDay = new Date(`${dates[dates.length - 1]}T23:59:59.999`);
     return {
-      start: bounds.start,
-      end: latestSourceDay < bounds.end ? latestSourceDay : bounds.end,
+      start: maxDate(bounds.start, firstProfileDay) || bounds.start,
+      end: bounds.end,
     };
   }
 
+  const expenseDates = expenses.map((expense) => expense.date).filter(Boolean);
+  const sourceDates = [...dates, ...expenseDates].sort();
+  const firstDataDay = sourceDates[0] ? dateFromKey(sourceDates[0], false) : null;
+  const latestDataDay = sourceDates[sourceDates.length - 1] ? dateFromKey(sourceDates[sourceDates.length - 1], true) : null;
+  const start = minDate(firstProfileDay, firstDataDay, todayStart) || todayStart;
+
   return {
-    start: new Date(`${dates[0]}T00:00:00`),
-    end: new Date(`${dates[dates.length - 1]}T23:59:59.999`),
+    start,
+    end: maxDate(latestDataDay, todayEnd) || todayEnd,
   };
 }
 
@@ -3383,7 +3411,7 @@ function renderHeatmap() {
 }
 
 function renderShiftTables() {
-  const rows = dayRecords("all")
+  const rows = dayRecords(activePeriod)
     .slice(0, 8)
     .map((record) => {
       const clean = record.gross - record.expenses;
@@ -3403,6 +3431,7 @@ function renderShiftTables() {
     })
     .join("");
 
+  renderDays(periodSummary(activePeriod));
   elements.shiftTable.querySelectorAll(".table-row:not(.table-head)").forEach((row) => row.remove());
   elements.shiftTable.insertAdjacentHTML("beforeend", rows);
 
@@ -4250,8 +4279,9 @@ function setView(view) {
   const nextView = ["dashboard", "start", "archive", "data", "history", "profile"].includes(view) ? view : "home";
   elements.viewButtons.forEach((item) => item.classList.toggle("active", item.dataset.view === nextView));
   elements.viewPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.viewPanel === nextView));
-  elements.statsPeriodControls?.classList.toggle("hidden", nextView !== "dashboard");
-  if (nextView !== "dashboard") setCalendarOpen(false);
+  const hasPeriodControls = ["dashboard", "archive"].includes(nextView);
+  elements.statsPeriodControls?.classList.toggle("hidden", !hasPeriodControls);
+  if (!hasPeriodControls) setCalendarOpen(false);
   syncTelegramBackButton(nextView);
 }
 
