@@ -4304,7 +4304,6 @@ function setView(view) {
   elements.menuToggle?.setAttribute("aria-label", nextView === "home" ? "Открыть меню" : "Назад на главную");
   const hasPeriodControls = ["dashboard", "archive"].includes(nextView);
   elements.statsPeriodControls?.classList.toggle("hidden", !hasPeriodControls);
-  elements.statsPeriodControls?.classList.toggle("archive-mode", nextView === "archive");
   if (!hasPeriodControls) setCalendarOpen(false);
   syncTelegramBackButton(nextView);
 }
