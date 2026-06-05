@@ -2542,7 +2542,7 @@ h2 {
 
 .shift-time-row {
   display: grid;
-  grid-template-columns: minmax(160px, 1.15fr) repeat(2, minmax(126px, 0.8fr));
+  grid-template-columns: minmax(0, 1.15fr) repeat(2, minmax(0, 0.8fr));
   gap: 12px;
 }
 
@@ -2652,8 +2652,56 @@ h2 {
   height: 28px;
   color: #cfe0f3;
   font-style: normal;
-  font-size: 1.18rem;
+  font-size: 0;
   line-height: 1;
+  position: relative;
+}
+
+.app-picker-button i::before,
+.app-picker-button i::after {
+  content: "";
+  display: block;
+  position: absolute;
+}
+
+.app-picker-button[data-picker="date"] i::before {
+  width: 17px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-radius: 5px;
+  box-shadow: inset 0 5px 0 rgba(207, 224, 243, 0.18);
+}
+
+.app-picker-button[data-picker="date"] i::after {
+  width: 11px;
+  height: 2px;
+  top: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.72;
+}
+
+.app-picker-button[data-picker="time"] i::before {
+  width: 17px;
+  height: 17px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.app-picker-button[data-picker="time"] i::after {
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translate(-1px, -2px);
+}
+
+.app-picker-button[data-picker="select"] i::before {
+  width: 10px;
+  height: 10px;
+  border-right: 3px solid currentColor;
+  border-bottom: 3px solid currentColor;
+  transform: translateY(-3px) rotate(45deg);
 }
 
 .app-picker-button:focus-visible {
@@ -3306,6 +3354,22 @@ h2 {
   .orders-card {
     grid-column: auto;
     grid-row: auto;
+  }
+
+  .shift-time-row {
+    gap: 8px;
+  }
+
+  .app-picker-button {
+    grid-template-columns: minmax(0, 1fr) 22px;
+    min-height: 54px;
+    padding: 0 10px 0 12px;
+    font-size: 15px;
+  }
+
+  .app-picker-button i {
+    width: 22px;
+    height: 22px;
   }
 }
 
