@@ -3707,6 +3707,7 @@ function editShift(index) {
     end: shift.end || "",
     platform: shiftPlatform(shift),
     grossAmount: shiftRevenueForPlatform(shift),
+    orders: totalOrders(shift),
     km: shift.km || "",
   });
   updateShiftAutoSummary();
