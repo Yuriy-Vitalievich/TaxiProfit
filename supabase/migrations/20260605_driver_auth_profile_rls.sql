@@ -53,6 +53,25 @@ alter table public.shifts add column if not exists auth_user_id uuid references 
 alter table public.expenses add column if not exists auth_user_id uuid references auth.users(id) on delete set null;
 alter table public.settings add column if not exists auth_user_id uuid references auth.users(id) on delete set null;
 
+do $$
+declare
+  item record;
+begin
+  for item in
+    select conrelid::regclass as table_name, conname
+    from pg_constraint c
+    join unnest(c.conkey) key(attnum) on true
+    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = key.attnum
+    where c.contype = 'f'
+      and c.connamespace = 'public'::regnamespace
+      and c.conrelid in ('public.shifts'::regclass, 'public.expenses'::regclass, 'public.settings'::regclass)
+      and a.attname = 'user_id'
+  loop
+    execute format('alter table %s drop constraint if exists %I', item.table_name, item.conname);
+  end loop;
+end
+$$;
+
 update public.shifts s
 set auth_user_id = coalesce(s.auth_user_id, s.user_id),
     user_id = p.id
@@ -88,25 +107,6 @@ set auth_user_id = coalesce(s.auth_user_id, s.user_id),
     user_id = null
 where s.user_id is not null
   and not exists (select 1 from public.profiles p where p.id = s.user_id);
-
-do $$
-declare
-  item record;
-begin
-  for item in
-    select conrelid::regclass as table_name, conname
-    from pg_constraint c
-    join unnest(c.conkey) key(attnum) on true
-    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = key.attnum
-    where c.contype = 'f'
-      and c.connamespace = 'public'::regnamespace
-      and c.conrelid in ('public.shifts'::regclass, 'public.expenses'::regclass, 'public.settings'::regclass)
-      and a.attname = 'user_id'
-  loop
-    execute format('alter table %s drop constraint if exists %I', item.table_name, item.conname);
-  end loop;
-end
-$$;
 
 alter table public.shifts
   add constraint shifts_user_id_profiles_id_fkey
