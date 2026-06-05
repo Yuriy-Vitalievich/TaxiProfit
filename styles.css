@@ -943,6 +943,14 @@ body.telegram-mini-app .side-menu {
   display: none;
 }
 
+.stats-period-controls.archive-mode .period-switch {
+  display: none;
+}
+
+.stats-period-controls.archive-mode {
+  margin-bottom: 20px;
+}
+
 .screen-tabs {
   display: grid;
   grid-template-columns: 1fr;
