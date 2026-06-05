@@ -981,11 +981,11 @@ body.telegram-mini-app .side-menu {
   display: none;
 }
 
-.stats-period-controls.archive-mode .period-switch {
+.stats-period-controls .period-switch {
   display: none;
 }
 
-.stats-period-controls.archive-mode {
+.stats-period-controls {
   margin-bottom: 20px;
 }
 
@@ -3419,6 +3419,48 @@ h2 {
   }
 }
 
+@media (max-width: 900px) {
+  .archive-panel .shift-table {
+    overflow: visible;
+  }
+
+  .archive-panel .table-head {
+    display: none;
+  }
+
+  .archive-panel .table-row {
+    grid-template-columns: 1fr;
+    min-width: 0;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--line);
+  }
+
+  .archive-panel .table-row > span,
+  .archive-panel .table-row > strong {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--text);
+    text-align: right;
+  }
+
+  .archive-panel .table-row > span::before,
+  .archive-panel .table-row > strong::before {
+    color: var(--muted);
+    content: attr(data-label);
+    font-size: 0.76rem;
+    font-weight: 900;
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+  .archive-panel .score {
+    justify-self: stretch;
+  }
+}
+
 @media (max-width: 720px) {
   body {
     background:
@@ -3921,49 +3963,6 @@ h2 {
     font-size: 0.72rem;
     line-height: 1.2;
     text-align: right;
-  }
-
-  .archive-panel .shift-table {
-    margin: 0 -6px;
-    padding: 0 6px 6px;
-    overflow-x: auto;
-    overflow-y: visible;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-  }
-
-  .archive-panel .table-head {
-    display: grid;
-  }
-
-  .archive-panel .table-row {
-    display: grid;
-    grid-template-columns: 54px 78px 150px 76px 84px 56px;
-    min-width: 560px;
-    gap: 8px;
-    padding: 11px 12px;
-    border: 0;
-    border-radius: 14px;
-  }
-
-  .archive-panel .table-row > span,
-  .archive-panel .table-row > strong {
-    display: block;
-    color: var(--muted);
-    text-align: left;
-  }
-
-  .archive-panel .table-row strong {
-    color: var(--text);
-  }
-
-  .archive-panel .table-row > span::before,
-  .archive-panel .table-row > strong::before {
-    content: none;
-  }
-
-  .archive-panel .score {
-    justify-self: start;
   }
 
   .screen-tab {
