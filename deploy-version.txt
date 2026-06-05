@@ -35,3 +35,5 @@ TaxiProfit onboarding persistence fix
 2026-06-05T07:45:00Z
 TaxiProfit data entry polish
 2026-06-05T08:10:00Z
+TaxiProfit orders field
+2026-06-05T08:25:00Z
