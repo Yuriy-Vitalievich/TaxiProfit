@@ -4281,6 +4281,7 @@ function setView(view) {
   elements.viewPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.viewPanel === nextView));
   const hasPeriodControls = ["dashboard", "archive"].includes(nextView);
   elements.statsPeriodControls?.classList.toggle("hidden", !hasPeriodControls);
+  elements.statsPeriodControls?.classList.toggle("archive-mode", nextView === "archive");
   if (!hasPeriodControls) setCalendarOpen(false);
   syncTelegramBackButton(nextView);
 }
