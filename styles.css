@@ -1509,12 +1509,11 @@ body.telegram-mini-app .side-menu {
 
 .archive-layout {
   display: grid;
-  grid-template-columns: minmax(300px, 0.85fr) minmax(420px, 1.15fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
 
-.archive-calendar,
 .archive-shifts {
   display: grid;
   min-width: 0;
@@ -3224,8 +3223,8 @@ h2 {
 
 .table-row {
   display: grid;
-  grid-template-columns: 1.1fr 0.7fr 1fr 1fr 1fr;
-  min-width: 700px;
+  grid-template-columns: 0.8fr 0.8fr minmax(190px, 1.4fr) 0.8fr 0.8fr 0.8fr;
+  min-width: 820px;
   padding: 13px 14px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.045);
@@ -3279,8 +3278,7 @@ h2 {
   .hero-grid,
   .content-grid,
   .analytics-grid,
-  .data-grid,
-  .archive-layout {
+  .data-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

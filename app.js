@@ -3325,27 +3325,9 @@ function dayRecords(period) {
 }
 
 function renderDays(summary) {
-  const records = dayRecords("all");
-  elements.daysSummary.textContent = `${summary.shiftsWorked} рабочих · ${summary.daysOff} выходных`;
-  elements.daysGrid.innerHTML = records
-    .map((record) => {
-      const status = record.isWorkday ? "Рабочий" : "Выходной";
-      const className = record.isWorkday ? "workday" : "offday";
-      const shortStatus = record.isWorkday ? "Раб." : "Вых.";
-      const dayGross = Number(record.gross || 0);
-
-      return `
-        <article class="day-card ${className}">
-          <div>
-            <strong>${formatDate(record.date)}</strong>
-            <span class="day-status" title="${status}" aria-label="${status}">${shortStatus}</span>
-          </div>
-          <p>${record.isWorkday ? `${Number(record.hours.toFixed(1))} ч · ${record.orders} заказов` : "смены не было"}</p>
-          <b>${money(dayGross)}</b>
-        </article>
-      `;
-    })
-    .join("");
+  if (elements.daysSummary) {
+    elements.daysSummary.textContent = `${summary.shiftsWorked} рабочих · ${summary.daysOff} выходных`;
+  }
 }
 
 function formatDate(value) {
@@ -3412,6 +3394,7 @@ function renderShiftTables() {
         <div class="table-row ${record.isWorkday ? "" : "off-row"}">
           <span data-label="Дата">${formatDate(record.date)}</span>
           <span data-label="Статус"><i class="status-chip ${record.isWorkday ? "work" : "off"}">${record.isWorkday ? "Рабочий" : "Выходной"}</i></span>
+          <span data-label="Работа">${record.isWorkday ? `${Number(record.hours.toFixed(1))} ч · ${record.orders} заказов · ${Number(record.km || 0).toFixed(1)} км` : "смены не было"}</span>
           <span data-label="Касса">${money(record.gross)}</span>
           <strong data-label="Чистыми">${money(clean)}</strong>
           <span class="score ${scoreClass}" data-label="Эффективность">${record.isWorkday ? `${efficiency}%` : "—"}</span>
