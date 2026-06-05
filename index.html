@@ -10,11 +10,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="TaxiProfit - мобильный cockpit для учета смен, расходов и прибыли водителя такси." />
     <title>TaxiProfit</title>
-    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260605-7" />
+    <link rel="manifest" href="manifest.webmanifest?v=telegram-20260605-8" />
     <link rel="icon" href="assets/icons/taxiprofit-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/icons/taxiprofit-icon.svg" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=telegram-20260605-7" />
+    <link rel="stylesheet" href="styles.css?v=telegram-20260605-8" />
   </head>
   <body>
     <section class="auth-overlay" id="authOverlay" hidden aria-label="Вход в TaxiProfit">
@@ -22,7 +22,7 @@
         <div class="onboarding-logo" aria-hidden="true">🚖</div>
         <span class="section-kicker">TaxiProfit</span>
         <h1>Вход водителя</h1>
-        <p>Создай личный аккаунт Supabase или войди в существующий. Все смены, расходы и кабинет будут храниться только в твоем аккаунте.</p>
+        <p>В Telegram Mini App вход выполняется автоматически по Telegram ID. Email и пароль остаются запасным способом для браузера или тестирования.</p>
         <form class="auth-form-fields" id="authForm">
           <label>
             Email
@@ -56,8 +56,23 @@
           <button class="submit-button" type="button" id="onboardingStart">Создать профиль</button>
         </div>
 
-        <div class="onboarding-step" data-onboarding-step="carType">
+        <div class="onboarding-step" data-onboarding-step="driver">
           <span class="section-kicker">Шаг 1</span>
+          <h2>Данные водителя</h2>
+          <div class="form-grid onboarding-form-grid">
+            <label>
+              Имя
+              <input name="driverName" type="text" autocomplete="name" placeholder="Юрий" />
+            </label>
+            <label>
+              Аватар
+              <input name="avatarUrl" type="url" inputmode="url" placeholder="https://..." />
+            </label>
+          </div>
+        </div>
+
+        <div class="onboarding-step" data-onboarding-step="carType">
+          <span class="section-kicker">Шаг 2</span>
           <h2>На каком авто вы работаете?</h2>
           <div class="choice-grid" data-choice-group="carOwnership">
             <button type="button" data-choice-value="own">Собственное авто</button>
@@ -67,7 +82,7 @@
         </div>
 
         <div class="onboarding-step" data-onboarding-step="vehicle">
-          <span class="section-kicker">Шаг 2</span>
+          <span class="section-kicker">Шаг 3</span>
           <h2>Данные авто</h2>
           <div class="form-grid onboarding-form-grid">
             <label>
@@ -86,11 +101,25 @@
               Средний расход, л/100км
               <input name="fuelConsumption" type="number" min="0" step="0.1" placeholder="6.5" />
             </label>
+            <label>
+              Тип топлива
+              <select name="fuelType">
+                <option value="Бензин">Бензин</option>
+                <option value="Дизель">Дизель</option>
+                <option value="Газ">Газ</option>
+                <option value="Гибрид">Гибрид</option>
+                <option value="Электро">Электро</option>
+              </select>
+            </label>
+            <label>
+              Цена топлива, ₴/л
+              <input name="fuelPrice" type="number" min="0" step="0.01" placeholder="58.50" />
+            </label>
           </div>
         </div>
 
         <div class="onboarding-step" data-onboarding-step="rent">
-          <span class="section-kicker">Шаг 3</span>
+          <span class="section-kicker">Шаг 4</span>
           <h2>Условия аренды</h2>
           <p>Эти данные потом будут использоваться в аналитике прибыли.</p>
           <div class="form-grid onboarding-form-grid">
@@ -125,7 +154,7 @@
         </div>
 
         <div class="onboarding-step" data-onboarding-step="platforms">
-          <span class="section-kicker">Шаг 4</span>
+          <span class="section-kicker">Шаг 5</span>
           <h2>С какими агрегаторами вы работаете?</h2>
           <div class="choice-grid multi" data-choice-group="platforms">
             <button type="button" data-choice-value="Bolt">Bolt</button>
@@ -133,6 +162,12 @@
             <button type="button" data-choice-value="InDrive">InDrive</button>
             <button type="button" data-choice-value="Uber">Uber</button>
             <button type="button" data-choice-value="Другое">Другое</button>
+          </div>
+          <div class="form-grid onboarding-form-grid">
+            <label class="wide-field">
+              Недельный план по чистому доходу, ₴
+              <input name="weeklyGoal" type="number" min="1" step="500" value="10000" />
+            </label>
           </div>
         </div>
 
@@ -861,6 +896,22 @@
                 <input name="driverName" type="text" autocomplete="name" placeholder="Юрий" />
               </label>
               <label>
+                Аватар
+                <input name="avatarUrl" type="url" inputmode="url" placeholder="https://..." />
+              </label>
+              <label>
+                Telegram ID
+                <input name="telegramId" type="text" readonly />
+              </label>
+              <label>
+                Тип авто
+                <select name="carOwnership">
+                  <option value="own">Свое</option>
+                  <option value="rent">Аренда</option>
+                  <option value="fleet">Авто агрегатора</option>
+                </select>
+              </label>
+              <label>
                 Марка авто
                 <input name="carBrand" type="text" placeholder="Toyota" />
               </label>
@@ -876,6 +927,40 @@
                 Расход топлива, л/100 км
                 <input name="fuelConsumption" type="number" min="0" step="0.1" inputmode="decimal" placeholder="6.5" />
               </label>
+              <label>
+                Тип топлива
+                <select name="fuelType">
+                  <option value="Бензин">Бензин</option>
+                  <option value="Дизель">Дизель</option>
+                  <option value="Газ">Газ</option>
+                  <option value="Гибрид">Гибрид</option>
+                  <option value="Электро">Электро</option>
+                </select>
+              </label>
+              <label>
+                Цена топлива, ₴/л
+                <input name="fuelPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="58.50" />
+              </label>
+              <label>
+                Стоимость аренды, ₴
+                <input name="rentAmount" type="number" min="0" step="1" inputmode="decimal" placeholder="6300" />
+              </label>
+              <label>
+                Период аренды
+                <select name="rentFrequency">
+                  <option value="">Не арендую</option>
+                  <option value="day">День</option>
+                  <option value="week">Неделя</option>
+                  <option value="month">Месяц</option>
+                </select>
+              </label>
+              <fieldset class="wide-field platform-fieldset">
+                <legend>Рабочие агрегаторы</legend>
+                <label><input name="platform_Bolt" type="checkbox" value="Bolt" /> Bolt</label>
+                <label><input name="platform_Uklon" type="checkbox" value="Uklon" /> Uklon</label>
+                <label><input name="platform_InDrive" type="checkbox" value="InDrive" /> InDrive</label>
+                <label><input name="platform_Другое" type="checkbox" value="Другое" /> Другое</label>
+              </fieldset>
             </div>
 
             <div class="profile-form-actions">
@@ -919,6 +1004,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=telegram-20260605-7"></script>
+    <script src="app.js?v=telegram-20260605-8"></script>
   </body>
 </html>

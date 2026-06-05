@@ -8,7 +8,7 @@ const PROFILE_STORAGE_KEY = "taxiProfit.profile.v1";
 const PROFILE_DELETE_STORAGE_KEY = "taxiProfit.profileDeleted.v1";
 const ONBOARDING_DRAFT_STORAGE_KEY = "taxiProfit.onboardingDraft.v1";
 const DEFAULT_WEEKLY_GOAL = 10000;
-const ONBOARDING_STEPS = ["welcome", "carType", "vehicle", "rent", "platforms"];
+const ONBOARDING_STEPS = ["welcome", "driver", "carType", "vehicle", "rent", "platforms"];
 const CAR_CATALOG = {
   Toyota: ["Prius", "Camry", "Corolla", "RAV4", "Auris", "Другое"],
   Hyundai: ["Elantra", "Sonata", "Ioniq", "Accent", "Tucson", "Другое"],
@@ -263,6 +263,7 @@ let pendingShiftFinish = null;
 let activeShiftTimer = null;
 let weeklyGoal = loadWeeklyGoal();
 let realtimeClient = null;
+let realtimeChannel = null;
 let realtimeReloadTimer = null;
 let cloudLoadedOnce = false;
 let menuTouchStart = null;
@@ -375,6 +376,7 @@ function profileNumber(...values) {
 function normalizeProfile(profile = {}) {
   return {
     ...profile,
+    authUserId: profile.authUserId || profile.auth_user_id || "",
     userId: profile.userId || profile.user_id || "",
     telegramId: profile.telegramId || profile.telegram_id || "",
     telegramUsername: profile.telegramUsername || profile.telegram_username || "",
@@ -386,11 +388,12 @@ function normalizeProfile(profile = {}) {
     carYear: profileNumber(profile.carYear, profile.car_year),
     fuelType: profile.fuelType || profile.fuel_type || "",
     fuelConsumption: profileNumber(profile.fuelConsumption, profile.fuel_consumption),
+    fuelPrice: profileNumber(profile.fuelPrice, profile.fuel_price),
     odometer: profileNumber(profile.odometer),
     carNumber: profile.carNumber || profile.car_number || "",
     defaultPlatform: profile.defaultPlatform || profile.default_platform || "Bolt",
     rentAmount: profileNumber(profile.rentAmount, profile.rent_amount),
-    rentFrequency: profile.rentFrequency || profile.rent_frequency || "",
+    rentFrequency: profile.rentFrequency || profile.rent_frequency || profile.rentPeriod || profile.rent_period || "",
     rentPaymentDay: profile.rentPaymentDay || profile.rent_payment_day || "",
     avatarUrl: profile.avatarUrl || profile.avatar_url || "",
     weeklyGoal: profileNumber(profile.weeklyGoal, profile.weekly_goal, weeklyGoal, DEFAULT_WEEKLY_GOAL),
@@ -951,7 +954,11 @@ function getTelegramId() {
 }
 
 function getCloudOwnerUserId() {
-  return currentUser?.id || null;
+  return userProfile.userId || currentUser?.id || null;
+}
+
+function getCloudOwnerAuthUserId() {
+  return currentUser?.id || userProfile.authUserId || null;
 }
 
 function getCloudOwnerTelegramId() {
@@ -961,6 +968,7 @@ function getCloudOwnerTelegramId() {
 function cloudOwnerPayload() {
   return {
     user_id: getCloudOwnerUserId(),
+    auth_user_id: getCloudOwnerAuthUserId(),
     telegram_id: getCloudOwnerTelegramId(),
   };
 }
@@ -1039,6 +1047,9 @@ async function initializeAuth() {
     if (error) throw error;
     currentSession = data?.session || null;
     currentUser = currentSession?.user || null;
+    if (!currentUser && getTelegramId()) {
+      await signInWithTelegramSession(client);
+    }
     authReady = true;
     if (currentUser) await ensureUserProfile();
     renderProfile();
@@ -1054,28 +1065,64 @@ async function initializeAuth() {
   }
 }
 
+async function signInWithTelegramSession(client = createAuthClient()) {
+  if (!client || !getTelegramId()) return false;
+  const telegram = telegramProfilePayload();
+
+  try {
+    const { data, error } = await client.auth.signInAnonymously({
+      options: {
+        data: {
+          telegram_id: telegram.telegram_id ? String(telegram.telegram_id) : "",
+          telegram_username: telegram.telegram_username || "",
+          display_name: telegram.display_name || "",
+          full_name: telegram.display_name || "",
+          avatar_url: telegram.avatar_url || "",
+        },
+      },
+    });
+    if (error) throw error;
+    currentSession = data?.session || null;
+    currentUser = currentSession?.user || null;
+    if (currentUser) {
+      clearProfileDeletedMarker();
+      await ensureUserProfile();
+      return true;
+    }
+  } catch (error) {
+    console.warn("Telegram Supabase session unavailable.", error);
+    if (elements.authMessage) {
+      elements.authMessage.textContent = "Telegram ID получен, но Supabase anonymous auth не включен. Включи Anonymous sign-ins или войди по email.";
+    }
+  }
+
+  return false;
+}
+
 async function ensureProfileSaveSession() {
   return Boolean(currentUser);
 }
 
 function profileFromSupabase(row = {}) {
   return normalizeProfile({
-    userId: row.user_id || row.id || getCurrentUserId() || "",
+    userId: row.id || row.user_id || "",
+    authUserId: row.auth_user_id || (row.user_id === getCurrentUserId() ? row.user_id : "") || getCurrentUserId() || "",
     telegramId: row.telegram_id || "",
-    telegramUsername: row.telegram_username || "",
-    displayName: row.display_name || "",
-    driverName: row.driver_name || "",
-    carOwnership: row.car_ownership || "",
+    telegramUsername: row.telegram_username || row.username || "",
+    displayName: row.display_name || row.full_name || "",
+    driverName: row.driver_name || row.full_name || "",
+    carOwnership: row.car_ownership || row.car_type || "",
     carBrand: row.car_brand || "",
     carModel: row.car_model || "",
     carYear: row.car_year || "",
     fuelType: row.fuel_type || "",
     fuelConsumption: row.fuel_consumption,
+    fuelPrice: row.fuel_price,
     odometer: row.odometer,
     carNumber: row.car_number || "",
     defaultPlatform: row.default_platform || "Bolt",
     rentAmount: row.rent_amount || "",
-    rentFrequency: row.rent_frequency || "",
+    rentFrequency: row.rent_frequency || row.rent_period || "",
     rentPaymentDay: row.rent_payment_day || "",
     platforms: Array.isArray(row.platforms) ? row.platforms : [],
     phone: row.phone || "",
@@ -1089,21 +1136,27 @@ function profileFromSupabase(row = {}) {
 function profileToSupabasePayload(profile = userProfile) {
   const telegram = telegramProfilePayload();
   return {
+    auth_user_id: getCloudOwnerAuthUserId(),
     telegram_id: telegram.telegram_id || Number(profile.telegramId || 0) || null,
+    username: telegram.telegram_username || profile.telegramUsername || "",
+    full_name: profile.driverName || profile.displayName || telegram.display_name || "",
     telegram_username: telegram.telegram_username || profile.telegramUsername || "",
     display_name: profile.displayName || profile.driverName || telegram.display_name || "",
     driver_name: profile.driverName || profile.displayName || telegram.display_name || "",
     car_ownership: profile.carOwnership || "",
+    car_type: profile.carOwnership || "",
     car_brand: profile.carBrand || "",
     car_model: profile.carModel || "",
     car_year: Number(profile.carYear || 0) || null,
     fuel_type: profile.fuelType || "",
     fuel_consumption: Number(profile.fuelConsumption || 0) || null,
+    fuel_price: Number(profile.fuelPrice || 0) || null,
     odometer: Number(profile.odometer || 0) || null,
     car_number: profile.carNumber || "",
     default_platform: profile.defaultPlatform || selectedRunnerPlatform || "Bolt",
     rent_amount: Number(profile.rentAmount || 0) || null,
     rent_frequency: profile.rentFrequency || "",
+    rent_period: profile.rentFrequency || "",
     rent_payment_day: profile.rentPaymentDay || "",
     platforms: Array.isArray(profile.platforms) ? profile.platforms : [],
     phone: profile.phone || "",
@@ -1127,15 +1180,29 @@ async function ensureUserProfile() {
 
   try {
     let row = null;
+    const telegramId = getTelegramId();
+    const ownerFilters = [
+      `user_id.eq.${encodeURIComponent(getCurrentUserId())}`,
+      `auth_user_id.eq.${encodeURIComponent(getCurrentUserId())}`,
+    ];
+    if (telegramId) ownerFilters.push(`telegram_id.eq.${encodeURIComponent(telegramId)}`);
 
-    [row] = await cloudRequest("profiles", {
-      query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&select=*&limit=1`,
-    });
+    try {
+      [row] = await cloudRequest("profiles", {
+        query: `?or=(${ownerFilters.join(",")})&select=*&order=onboarding_completed.desc,updated_at.desc&limit=1`,
+      });
+    } catch (profileQueryError) {
+      console.warn("Profile owner query fallback used.", profileQueryError);
+      [row] = await cloudRequest("profiles", {
+        query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&select=*&limit=1`,
+      });
+    }
 
     if (row) {
       saveLocalProfile(profileFromSupabase(row));
       if (userProfile.defaultPlatform) selectedRunnerPlatform = userProfile.defaultPlatform;
       if (Number(userProfile.weeklyGoal) > 0) saveWeeklyGoal(Number(userProfile.weeklyGoal));
+      await loadDriverSettings();
       renderProfile();
       fillOnboardingInputs();
       renderOnboarding();
@@ -1188,6 +1255,7 @@ async function saveUserProfile(profile, options = {}) {
       });
       const savedProfileRow = Array.isArray(savedProfile) ? savedProfile[0] : savedProfile;
       if (savedProfileRow) saveLocalProfile(profileFromSupabase(savedProfileRow));
+      await saveDriverSettings(profile);
       renderProfile("Профиль сохранен в Supabase.");
       renderOnboarding();
       return true;
@@ -1202,6 +1270,7 @@ async function saveUserProfile(profile, options = {}) {
       body: { ...payload, user_id: getCurrentUserId() },
     });
     if (savedProfileRow) saveLocalProfile(profileFromSupabase(savedProfileRow));
+    await saveDriverSettings(profile);
     renderProfile("Профиль сохранен в Supabase.");
     renderOnboarding();
     return true;
@@ -1213,6 +1282,85 @@ async function saveUserProfile(profile, options = {}) {
     const errorMessage = String(error?.message || error || "неизвестная ошибка");
     renderProfile(`Supabase не сохранил профиль: ${errorMessage.slice(0, 180)}`);
     renderOnboarding();
+    return false;
+  }
+}
+
+function driverSettingsPayload(profile = userProfile) {
+  return {
+    user_id: getCloudOwnerUserId(),
+    car_type: profile.carOwnership || "",
+    car_brand: profile.carBrand || "",
+    car_model: profile.carModel || "",
+    odometer: Number(profile.odometer || 0) || null,
+    fuel_consumption: Number(profile.fuelConsumption || 0) || null,
+    fuel_type: profile.fuelType || "",
+    fuel_price: Number(profile.fuelPrice || 0) || null,
+    rent_amount: Number(profile.rentAmount || 0) || null,
+    rent_period: profile.rentFrequency || "",
+    weekly_goal: Number(profile.weeklyGoal || weeklyGoal || DEFAULT_WEEKLY_GOAL),
+  };
+}
+
+async function loadDriverSettings() {
+  if (!hasCloudStorage() || !getCloudOwnerUserId()) return false;
+
+  try {
+    const [settings] = await cloudRequest("driver_settings", {
+      query: `?user_id=eq.${encodeURIComponent(getCloudOwnerUserId())}&select=*&limit=1`,
+    });
+    if (!settings) return false;
+    saveLocalProfile(profileFromSupabase({ ...userProfile, ...settings, id: getCloudOwnerUserId() }));
+    return true;
+  } catch (error) {
+    console.warn("Driver settings unavailable.", error);
+    return false;
+  }
+}
+
+async function saveDriverSettings(profile = userProfile) {
+  if (!hasCloudStorage() || !getCloudOwnerUserId()) return false;
+
+  try {
+    await cloudRequest("driver_settings", {
+      method: "POST",
+      query: "?on_conflict=user_id",
+      prefer: "resolution=merge-duplicates,return=minimal",
+      body: driverSettingsPayload(profile),
+    });
+    await saveDriverPlatforms(profile.platforms || []);
+    return true;
+  } catch (error) {
+    console.warn("Driver settings were not synced.", error);
+    return false;
+  }
+}
+
+async function saveDriverPlatforms(platforms = []) {
+  if (!hasCloudStorage() || !getCloudOwnerUserId()) return false;
+  const userId = getCloudOwnerUserId();
+  const selected = new Set((platforms.length ? platforms : ["Bolt"]).map(String));
+  const known = ["Bolt", "Uklon", "InDrive", "Indrive", "Uber", "Другое"];
+  const names = [...new Set([...known, ...selected])];
+
+  try {
+    await cloudRequest("driver_platforms", {
+      method: "DELETE",
+      query: `?user_id=eq.${encodeURIComponent(userId)}`,
+      prefer: "return=minimal",
+    });
+    await cloudRequest("driver_platforms", {
+      method: "POST",
+      prefer: "return=minimal",
+      body: names.map((platform_name) => ({
+        user_id: userId,
+        platform_name,
+        is_active: selected.has(platform_name),
+      })),
+    });
+    return true;
+  } catch (error) {
+    console.warn("Driver platforms were not synced.", error);
     return false;
   }
 }
@@ -1276,10 +1424,18 @@ function readProfileForm() {
   return {
     ...userProfile,
     driverName: String(data.get("driverName") || "").trim(),
+    avatarUrl: String(data.get("avatarUrl") || "").trim(),
+    telegramId: userProfile.telegramId || getTelegramId() || "",
+    carOwnership: String(data.get("carOwnership") || userProfile.carOwnership || "own"),
     carBrand: String(data.get("carBrand") || "").trim(),
     carModel: String(data.get("carModel") || "").trim(),
     odometer: Number(data.get("odometer") || 0) || "",
+    fuelType: String(data.get("fuelType") || "").trim(),
     fuelConsumption: Number(data.get("fuelConsumption") || 0) || "",
+    fuelPrice: Number(data.get("fuelPrice") || 0) || "",
+    rentAmount: Number(data.get("rentAmount") || 0) || "",
+    rentFrequency: String(data.get("rentFrequency") || "").trim(),
+    platforms: ["Bolt", "Uklon", "InDrive", "Другое"].filter((name) => data.get(`platform_${name}`)),
     weeklyGoal: Number(data.get("weeklyGoal") || weeklyGoal || DEFAULT_WEEKLY_GOAL),
   };
 }
@@ -1288,11 +1444,22 @@ function fillProfileForm() {
   if (!elements.profileForm) return;
   const profile = { ...userProfile };
   elements.profileForm.elements.driverName.value = profile.driverName || profile.displayName || telegramDisplayName() || "";
+  if (elements.profileForm.elements.avatarUrl) elements.profileForm.elements.avatarUrl.value = profile.avatarUrl || "";
+  if (elements.profileForm.elements.telegramId) elements.profileForm.elements.telegramId.value = profile.telegramId || getTelegramId() || "";
+  if (elements.profileForm.elements.carOwnership) elements.profileForm.elements.carOwnership.value = profile.carOwnership || "own";
   elements.profileForm.elements.carBrand.value = profile.carBrand || "";
   elements.profileForm.elements.carModel.value = profile.carModel || "";
   elements.profileForm.elements.odometer.value = profile.odometer || "";
+  if (elements.profileForm.elements.fuelType) elements.profileForm.elements.fuelType.value = profile.fuelType || "Бензин";
   elements.profileForm.elements.fuelConsumption.value = profile.fuelConsumption || "";
+  if (elements.profileForm.elements.fuelPrice) elements.profileForm.elements.fuelPrice.value = profile.fuelPrice || "";
+  if (elements.profileForm.elements.rentAmount) elements.profileForm.elements.rentAmount.value = profile.rentAmount || "";
+  if (elements.profileForm.elements.rentFrequency) elements.profileForm.elements.rentFrequency.value = profile.rentFrequency || "";
   elements.profileForm.elements.weeklyGoal.value = Number(profile.weeklyGoal || weeklyGoal || DEFAULT_WEEKLY_GOAL);
+  ["Bolt", "Uklon", "InDrive", "Другое"].forEach((name) => {
+    const field = elements.profileForm.elements[`platform_${name}`];
+    if (field) field.checked = (profile.platforms || []).includes(name);
+  });
 }
 
 function renderProfile(message = "") {
@@ -1460,11 +1627,13 @@ function readOnboardingInputs() {
   onboardingDraft = {
     ...onboardingDraft,
     driverName: textValue("driverName") || telegramDisplayName() || userProfile.driverName || "",
+    avatarUrl: textValue("avatarUrl") || telegramProfilePayload().avatar_url || userProfile.avatarUrl || "",
     carBrand: textValue("carBrand"),
     carModel: textValue("carModel"),
     carYear: numberValue("carYear"),
     fuelType: textValue("fuelType") || "Бензин",
     fuelConsumption: numberValue("fuelConsumption"),
+    fuelPrice: numberValue("fuelPrice"),
     odometer: numberValue("odometer"),
     rentAmount: numberValue("rentAmount"),
     rentFrequency: textValue("rentFrequency"),
@@ -1477,7 +1646,7 @@ function fillOnboardingInputs() {
   const root = elements.onboardingOverlay;
   if (!root) return;
   const source = { ...userProfile, ...onboardingDraft };
-  ["driverName", "carBrand", "carModel", "carYear", "fuelType", "fuelConsumption", "odometer", "rentAmount", "rentFrequency", "rentPaymentDay"].forEach((name) => {
+  ["driverName", "avatarUrl", "carBrand", "carModel", "carYear", "fuelType", "fuelConsumption", "fuelPrice", "odometer", "rentAmount", "rentFrequency", "rentPaymentDay", "weeklyGoal"].forEach((name) => {
     const input = root.querySelector(`[name="${name}"]`);
     if (input && source[name] !== undefined && source[name] !== null) input.value = source[name];
   });
@@ -1505,11 +1674,13 @@ async function finishOnboarding() {
     ...onboardingDraft,
     telegramId: telegram.telegram_id || userProfile.telegramId || "",
     telegramUsername: telegram.telegram_username || userProfile.telegramUsername || "",
+    avatarUrl: onboardingDraft.avatarUrl || telegram.avatar_url || userProfile.avatarUrl || "",
     carOwnership: onboardingDraft.carOwnership || userProfile.carOwnership || "own",
     driverName: onboardingDraft.driverName || userProfile.driverName || telegramDisplayName() || "",
     displayName: userProfile.displayName || telegramDisplayName() || onboardingDraft.driverName || "",
     platforms,
     defaultPlatform: userProfile.defaultPlatform || platforms[0],
+    weeklyGoal: Number(onboardingDraft.weeklyGoal || userProfile.weeklyGoal || weeklyGoal || DEFAULT_WEEKLY_GOAL),
     onboardingCompleted: true,
   };
 
@@ -1611,6 +1782,43 @@ async function sendToGoogleSheet(type, payload) {
 function stripRemoteId(item) {
   const { remoteId, ...payload } = item;
   return payload;
+}
+
+function shiftCloudColumns(shift) {
+  const payload = stripRemoteId(shift);
+  const grossIncome = Number(payload.gross || 0);
+  const fuelCost = Number(payload.fuel || 0);
+  const rentCost = Number(payload.rent || 0);
+  const otherExpenses = Number(payload.other || payload.wash || 0) + Number(payload.fees || 0);
+
+  return {
+    payload,
+    platform: shiftPlatform(payload),
+    start_time: payload.date && payload.start ? `${payload.date}T${normalizeTime(payload.start)}:00` : null,
+    end_time: payload.date && payload.end ? `${payload.date}T${normalizeTime(payload.end)}:00` : null,
+    work_duration: Number(payload.hours || 0) || null,
+    start_odometer: Number(payload.odometerStart || 0) || null,
+    end_odometer: Number(payload.odometerEnd || 0) || null,
+    total_km: Number(payload.totalKm || payload.actualKm || payload.km || 0) || null,
+    paid_km: Number(payload.km || 0) || null,
+    empty_km: Number(payload.extraKm || 0) || null,
+    orders_count: totalOrders(payload),
+    gross_income: grossIncome,
+    fuel_cost: fuelCost,
+    rent_cost: rentCost,
+    other_expenses: otherExpenses,
+    net_income: grossIncome - fuelCost - rentCost - otherExpenses,
+  };
+}
+
+function expenseCloudColumns(expense) {
+  const payload = stripRemoteId(expense);
+  return {
+    payload,
+    expense_type: payload.category || "Прочие",
+    amount: Number(payload.amount || 0),
+    comment: payload.comment || payload.description || "",
+  };
 }
 
 function normalizeCloudShift(row) {
@@ -1746,8 +1954,12 @@ function setupRealtimeSync({ includeSettings = false } = {}) {
   }
 
   realtimeClient = createAuthClient();
+  if (realtimeChannel) {
+    realtimeClient.removeChannel?.(realtimeChannel);
+    realtimeChannel = null;
+  }
 
-  const channel = realtimeClient
+  realtimeChannel = realtimeClient
     .channel(`taxiprofit-live-${realtimeFilter}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "shifts", filter: realtimeFilter }, () => {
       scheduleCloudReload("Смены обновлены в облаке.");
@@ -1757,12 +1969,12 @@ function setupRealtimeSync({ includeSettings = false } = {}) {
     });
 
   if (includeSettings) {
-    channel.on("postgres_changes", { event: "*", schema: "public", table: "settings", filter: realtimeFilter }, () => {
+    realtimeChannel.on("postgres_changes", { event: "*", schema: "public", table: "settings", filter: realtimeFilter }, () => {
       scheduleSettingsReload();
     });
   }
 
-  channel.subscribe((status) => {
+  realtimeChannel.subscribe((status) => {
     if (status === "SUBSCRIBED") {
       setSyncStatus("Realtime включен: данные синхронизируются между устройствами.");
     }
@@ -1812,18 +2024,18 @@ async function saveShiftToCloud(shift) {
   if (!hasCloudStorage() || !requireCloudUser()) return shift;
 
   const ownerPayload = cloudOwnerPayload();
-  const payload = stripRemoteId(shift);
+  const rowPayload = { ...ownerPayload, ...shiftCloudColumns(shift) };
   try {
     if (shift.remoteId) {
       await cloudRequest("shifts", {
         method: "PATCH",
         query: `?id=eq.${encodeURIComponent(shift.remoteId)}`,
-        body: { payload, ...ownerPayload },
+        body: rowPayload,
       });
       return shift;
     }
 
-    const [data] = await cloudRequest("shifts", { method: "POST", body: { ...ownerPayload, payload } });
+    const [data] = await cloudRequest("shifts", { method: "POST", body: rowPayload });
     return { ...shift, remoteId: data.id };
   } catch (error) {
     console.warn("Shift was saved locally but not synced to Supabase.", error);
@@ -1835,18 +2047,18 @@ async function saveExpenseToCloud(expense) {
   if (!hasCloudStorage() || !requireCloudUser()) return expense;
 
   const ownerPayload = cloudOwnerPayload();
-  const payload = stripRemoteId(expense);
+  const rowPayload = { ...ownerPayload, ...expenseCloudColumns(expense) };
   try {
     if (expense.remoteId) {
       await cloudRequest("expenses", {
         method: "PATCH",
         query: `?id=eq.${encodeURIComponent(expense.remoteId)}`,
-        body: { payload, ...ownerPayload },
+        body: rowPayload,
       });
       return expense;
     }
 
-    const [data] = await cloudRequest("expenses", { method: "POST", body: { ...ownerPayload, payload } });
+    const [data] = await cloudRequest("expenses", { method: "POST", body: rowPayload });
     return { ...expense, remoteId: data.id };
   } catch (error) {
     console.warn("Expense was saved locally but not synced to Supabase.", error);
@@ -1885,7 +2097,10 @@ async function replaceCloudTable(table, items) {
 
     const data = await cloudRequest(table, {
       method: "POST",
-      body: items.map((item) => ({ ...ownerPayload, payload: stripRemoteId(item) })),
+      body: items.map((item) => ({
+        ...ownerPayload,
+        ...(table === "shifts" ? shiftCloudColumns(item) : expenseCloudColumns(item)),
+      })),
     });
 
     data.forEach((row, index) => {
@@ -1916,6 +2131,10 @@ function writeStorage(value, key = STORAGE_KEY) {
 
 function money(value) {
   return `₴ ${new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 0 }).format(Math.round(value || 0))}`;
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 1 }).format(Number(value || 0));
 }
 
 function signedMoney(value) {
@@ -3223,6 +3442,14 @@ function renderShiftRunner() {
 }
 
 function startRunnerShift() {
+  if (!hasCompletedDriverProfile()) {
+    renderProfile("Сначала заполни кабинет водителя, затем можно начинать смену.");
+    setView("profile");
+    history.replaceState(null, "", "#profile");
+    renderOnboarding();
+    return;
+  }
+
   const odometerStart = readNumber({ get: (name) => (name === "odometerStart" ? elements.startOdometer?.value : "") }, "odometerStart");
   if (!odometerStart && odometerStart !== 0) return;
   if (!Number.isFinite(odometerStart) || odometerStart <= 0) {
@@ -3648,10 +3875,12 @@ elements.profileButton?.addEventListener("click", () => {
 });
 
 elements.authStartButton?.addEventListener("click", async () => {
-  await initializeAuth();
+  const client = createAuthClient();
+  if (!currentUser && getTelegramId()) await signInWithTelegramSession(client);
+  else await initializeAuth();
   if (elements.authMessage) {
     elements.authMessage.textContent = currentUser
-      ? "Вход активен. Можно заполнять кабинет водителя."
+      ? "Telegram-сессия активна. Можно заполнять кабинет водителя."
       : "Вход не найден. Создай аккаунт или войди.";
   }
 });
@@ -4084,6 +4313,12 @@ window.addEventListener("hashchange", () => {
 
 elements.shiftForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!hasCompletedDriverProfile()) {
+    renderProfile("Сначала заполни кабинет водителя, затем можно добавлять смены.");
+    setView("profile");
+    history.replaceState(null, "", "#profile");
+    return;
+  }
   const formData = new FormData(elements.shiftForm);
   let nextShift = shiftFromForm(formData);
 
@@ -4204,6 +4439,12 @@ elements.goalInput?.addEventListener("input", () => {
 
 elements.expenseForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!hasCompletedDriverProfile()) {
+    renderProfile("Сначала заполни кабинет водителя, затем можно добавлять расходы.");
+    setView("profile");
+    history.replaceState(null, "", "#profile");
+    return;
+  }
   const formData = new FormData(elements.expenseForm);
   let nextExpense = expenseFromForm(formData);
 
