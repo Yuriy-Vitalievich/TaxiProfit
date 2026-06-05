@@ -378,8 +378,12 @@ function normalizeProfile(profile = {}) {
     ...profile,
     authUserId: profile.authUserId || profile.auth_user_id || "",
     userId: profile.userId || profile.user_id || "",
+    activeCarId: profile.activeCarId || profile.active_car_id || profile.carId || profile.car_id || "",
     telegramId: profile.telegramId || profile.telegram_id || "",
     telegramUsername: profile.telegramUsername || profile.telegram_username || "",
+    firstName: profile.firstName || profile.first_name || "",
+    lastName: profile.lastName || profile.last_name || "",
+    fullName: profile.fullName || profile.full_name || "",
     displayName: profile.displayName || profile.display_name || "",
     driverName: profile.driverName || profile.driver_name || "",
     carOwnership: profile.carOwnership || profile.car_ownership || "",
@@ -575,11 +579,16 @@ function telegramDisplayName(user = getTelegramUser()) {
 
 function telegramProfilePayload(user = getTelegramUser()) {
   if (!user) return {};
+  const fullName = telegramDisplayName(user);
 
   return {
     telegram_id: user.id ? Number(user.id) : null,
+    username: user.username || "",
     telegram_username: user.username || "",
-    display_name: telegramDisplayName(user),
+    first_name: user.first_name || "",
+    last_name: user.last_name || "",
+    full_name: fullName,
+    display_name: fullName,
     avatar_url: user.photo_url || "",
   };
 }
@@ -1107,14 +1116,18 @@ function profileFromSupabase(row = {}) {
   return normalizeProfile({
     userId: row.id || row.user_id || "",
     authUserId: row.auth_user_id || (row.user_id === getCurrentUserId() ? row.user_id : "") || getCurrentUserId() || "",
+    activeCarId: row.active_car_id || row.car_id || "",
     telegramId: row.telegram_id || "",
     telegramUsername: row.telegram_username || row.username || "",
+    firstName: row.first_name || "",
+    lastName: row.last_name || "",
+    fullName: row.full_name || "",
     displayName: row.display_name || row.full_name || "",
-    driverName: row.driver_name || row.full_name || "",
-    carOwnership: row.car_ownership || row.car_type || "",
-    carBrand: row.car_brand || "",
-    carModel: row.car_model || "",
-    carYear: row.car_year || "",
+    driverName: row.driver_name || row.display_name || row.full_name || "",
+    carOwnership: row.car_ownership || row.car_type || row.ownership_type || "",
+    carBrand: row.car_brand || row.brand || "",
+    carModel: row.car_model || row.model || "",
+    carYear: row.car_year || row.year || "",
     fuelType: row.fuel_type || "",
     fuelConsumption: row.fuel_consumption,
     fuelPrice: row.fuel_price,
@@ -1139,7 +1152,9 @@ function profileToSupabasePayload(profile = userProfile) {
     auth_user_id: getCloudOwnerAuthUserId(),
     telegram_id: telegram.telegram_id || Number(profile.telegramId || 0) || null,
     username: telegram.telegram_username || profile.telegramUsername || "",
-    full_name: profile.driverName || profile.displayName || telegram.display_name || "",
+    first_name: telegram.first_name || profile.firstName || "",
+    last_name: telegram.last_name || profile.lastName || "",
+    full_name: profile.driverName || profile.displayName || telegram.full_name || "",
     telegram_username: telegram.telegram_username || profile.telegramUsername || "",
     display_name: profile.displayName || profile.driverName || telegram.display_name || "",
     driver_name: profile.driverName || profile.displayName || telegram.display_name || "",
@@ -1181,28 +1196,43 @@ async function ensureUserProfile() {
   try {
     let row = null;
     const telegramId = getTelegramId();
+    if (telegramId) {
+      try {
+        const savedProfile = await cloudRequest("rpc/get_or_create_telegram_profile", {
+          method: "POST",
+          body: { profile_payload: profileToSupabasePayload(userProfile) },
+        });
+        row = Array.isArray(savedProfile) ? savedProfile[0] : savedProfile;
+      } catch (rpcError) {
+        console.warn("Telegram profile lookup RPC unavailable, using REST fallback.", rpcError);
+      }
+    }
+
     const ownerFilters = [
       `user_id.eq.${encodeURIComponent(getCurrentUserId())}`,
       `auth_user_id.eq.${encodeURIComponent(getCurrentUserId())}`,
     ];
     if (telegramId) ownerFilters.push(`telegram_id.eq.${encodeURIComponent(telegramId)}`);
 
-    try {
-      [row] = await cloudRequest("profiles", {
-        query: `?or=(${ownerFilters.join(",")})&select=*&order=onboarding_completed.desc,updated_at.desc&limit=1`,
-      });
-    } catch (profileQueryError) {
-      console.warn("Profile owner query fallback used.", profileQueryError);
-      [row] = await cloudRequest("profiles", {
-        query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&select=*&limit=1`,
-      });
+    if (!row) {
+      try {
+        [row] = await cloudRequest("profiles", {
+          query: `?or=(${ownerFilters.join(",")})&select=*&order=onboarding_completed.desc,updated_at.desc&limit=1`,
+        });
+      } catch (profileQueryError) {
+        console.warn("Profile owner query fallback used.", profileQueryError);
+        [row] = await cloudRequest("profiles", {
+          query: `?user_id=eq.${encodeURIComponent(getCurrentUserId())}&select=*&limit=1`,
+        });
+      }
     }
 
     if (row) {
       saveLocalProfile(profileFromSupabase(row));
       if (userProfile.defaultPlatform) selectedRunnerPlatform = userProfile.defaultPlatform;
       if (Number(userProfile.weeklyGoal) > 0) saveWeeklyGoal(Number(userProfile.weeklyGoal));
-      await loadDriverSettings();
+      await loadDriverCabinet();
+      await loadActiveCar();
       renderProfile();
       fillOnboardingInputs();
       renderOnboarding();
@@ -1255,6 +1285,8 @@ async function saveUserProfile(profile, options = {}) {
       });
       const savedProfileRow = Array.isArray(savedProfile) ? savedProfile[0] : savedProfile;
       if (savedProfileRow) saveLocalProfile(profileFromSupabase(savedProfileRow));
+      await saveDriverCabinet(profile);
+      await saveActiveCar(profile);
       await saveDriverSettings(profile);
       renderProfile("Профиль сохранен в Supabase.");
       renderOnboarding();
@@ -1270,6 +1302,8 @@ async function saveUserProfile(profile, options = {}) {
       body: { ...payload, user_id: getCurrentUserId() },
     });
     if (savedProfileRow) saveLocalProfile(profileFromSupabase(savedProfileRow));
+    await saveDriverCabinet(profile);
+    await saveActiveCar(profile);
     await saveDriverSettings(profile);
     renderProfile("Профиль сохранен в Supabase.");
     renderOnboarding();
@@ -1282,6 +1316,116 @@ async function saveUserProfile(profile, options = {}) {
     const errorMessage = String(error?.message || error || "неизвестная ошибка");
     renderProfile(`Supabase не сохранил профиль: ${errorMessage.slice(0, 180)}`);
     renderOnboarding();
+    return false;
+  }
+}
+
+function driverCabinetPayload(profile = userProfile) {
+  return {
+    user_id: getCloudOwnerUserId(),
+    display_name: profile.driverName || profile.displayName || profile.fullName || telegramDisplayName() || "",
+    avatar_url: profile.avatarUrl || telegramProfilePayload().avatar_url || "",
+    weekly_goal: Number(profile.weeklyGoal || weeklyGoal || DEFAULT_WEEKLY_GOAL),
+    default_platform: profile.defaultPlatform || selectedRunnerPlatform || "Bolt",
+  };
+}
+
+function activeCarPayload(profile = userProfile) {
+  return {
+    user_id: getCloudOwnerUserId(),
+    ownership_type: profile.carOwnership || "own",
+    brand: profile.carBrand || "",
+    model: profile.carModel || "",
+    year: Number(profile.carYear || 0) || null,
+    odometer: Number(profile.odometer || 0) || null,
+    fuel_type: profile.fuelType || "",
+    fuel_consumption: Number(profile.fuelConsumption || 0) || null,
+    fuel_price: Number(profile.fuelPrice || 0) || null,
+    rent_amount: Number(profile.rentAmount || 0) || null,
+    rent_period: profile.rentFrequency || "",
+    is_active: true,
+  };
+}
+
+async function loadDriverCabinet() {
+  if (!hasCloudStorage() || !getCloudOwnerUserId()) return false;
+
+  try {
+    const [cabinet] = await cloudRequest("driver_cabinets", {
+      query: `?user_id=eq.${encodeURIComponent(getCloudOwnerUserId())}&select=*&limit=1`,
+    });
+    if (!cabinet) return false;
+    saveLocalProfile(profileFromSupabase({ ...userProfile, ...cabinet, id: getCloudOwnerUserId() }));
+    return true;
+  } catch (error) {
+    console.warn("Driver cabinet unavailable.", error);
+    return false;
+  }
+}
+
+async function loadActiveCar() {
+  if (!hasCloudStorage() || !getCloudOwnerUserId()) return false;
+
+  try {
+    const [car] = await cloudRequest("cars", {
+      query: `?user_id=eq.${encodeURIComponent(getCloudOwnerUserId())}&is_active=eq.true&select=*&limit=1`,
+    });
+    if (!car) return false;
+    saveLocalProfile(profileFromSupabase({ ...userProfile, ...car, active_car_id: car.id, id: getCloudOwnerUserId() }));
+    return true;
+  } catch (error) {
+    console.warn("Active car unavailable.", error);
+    return false;
+  }
+}
+
+async function saveDriverCabinet(profile = userProfile) {
+  if (!hasCloudStorage() || !getCloudOwnerUserId()) return false;
+
+  try {
+    await cloudRequest("driver_cabinets", {
+      method: "POST",
+      query: "?on_conflict=user_id",
+      prefer: "resolution=merge-duplicates,return=minimal",
+      body: driverCabinetPayload(profile),
+    });
+    return true;
+  } catch (error) {
+    console.warn("Driver cabinet was not synced.", error);
+    return false;
+  }
+}
+
+async function saveActiveCar(profile = userProfile) {
+  if (!hasCloudStorage() || !getCloudOwnerUserId()) return false;
+
+  try {
+    let carId = profile.activeCarId || "";
+    if (!carId) {
+      const [existingCar] = await cloudRequest("cars", {
+        query: `?user_id=eq.${encodeURIComponent(getCloudOwnerUserId())}&is_active=eq.true&select=id&limit=1`,
+      });
+      carId = existingCar?.id || "";
+    }
+
+    let savedCar = null;
+    if (carId) {
+      [savedCar] = await cloudRequest("cars", {
+        method: "PATCH",
+        query: `?id=eq.${encodeURIComponent(carId)}`,
+        body: activeCarPayload(profile),
+      });
+    } else {
+      [savedCar] = await cloudRequest("cars", {
+        method: "POST",
+        body: activeCarPayload(profile),
+      });
+    }
+
+    if (savedCar?.id) saveLocalProfile({ ...userProfile, activeCarId: savedCar.id });
+    return true;
+  } catch (error) {
+    console.warn("Active car was not synced.", error);
     return false;
   }
 }
@@ -1793,6 +1937,7 @@ function shiftCloudColumns(shift) {
 
   return {
     payload,
+    car_id: userProfile.activeCarId || null,
     platform: shiftPlatform(payload),
     start_time: payload.date && payload.start ? `${payload.date}T${normalizeTime(payload.start)}:00` : null,
     end_time: payload.date && payload.end ? `${payload.date}T${normalizeTime(payload.end)}:00` : null,
@@ -1815,6 +1960,7 @@ function expenseCloudColumns(expense) {
   const payload = stripRemoteId(expense);
   return {
     payload,
+    car_id: userProfile.activeCarId || null,
     expense_type: payload.category || "Прочие",
     amount: Number(payload.amount || 0),
     comment: payload.comment || payload.description || "",
