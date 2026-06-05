@@ -3818,6 +3818,97 @@ h2 {
     justify-self: stretch;
   }
 
+  .archive-panel .section-head {
+    align-items: flex-start;
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .archive-panel .section-head > div:first-child {
+    min-width: 0;
+  }
+
+  .archive-panel .archive-actions {
+    align-items: flex-end;
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 54%;
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .archive-panel .archive-actions .muted {
+    max-width: 118px;
+    font-size: 0.76rem;
+    font-weight: 850;
+    line-height: 1.18;
+    text-align: right;
+  }
+
+  .archive-panel .archive-actions .ghost-button {
+    width: auto;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 14px;
+    font-size: 0.9rem;
+  }
+
+  .archive-panel .archive-subhead {
+    align-items: flex-end;
+    flex-direction: row;
+  }
+
+  .archive-panel .archive-subhead span {
+    max-width: 54%;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    text-align: right;
+  }
+
+  .archive-panel .shift-table {
+    margin: 0 -6px;
+    padding: 0 6px 6px;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .archive-panel .table-head {
+    display: grid;
+  }
+
+  .archive-panel .table-row {
+    display: grid;
+    grid-template-columns: 54px 78px 150px 76px 84px 56px;
+    min-width: 560px;
+    gap: 8px;
+    padding: 11px 12px;
+    border: 0;
+    border-radius: 14px;
+  }
+
+  .archive-panel .table-row > span,
+  .archive-panel .table-row > strong {
+    display: block;
+    color: var(--muted);
+    text-align: left;
+  }
+
+  .archive-panel .table-row strong {
+    color: var(--text);
+  }
+
+  .archive-panel .table-row > span::before,
+  .archive-panel .table-row > strong::before {
+    content: none;
+  }
+
+  .archive-panel .score {
+    justify-self: start;
+  }
+
   .screen-tab {
     width: 100%;
     min-height: 40px;
@@ -3829,6 +3920,50 @@ h2 {
 @media (max-width: 420px) {
   .app-shell {
     padding: 8px;
+  }
+
+  .archive-panel {
+    gap: 14px;
+    padding: 14px 12px;
+  }
+
+  .archive-panel .section-head {
+    gap: 8px;
+  }
+
+  .archive-panel .archive-actions {
+    max-width: 52%;
+    gap: 6px;
+  }
+
+  .archive-panel .archive-actions .muted {
+    max-width: 86px;
+    font-size: 0.68rem;
+  }
+
+  .archive-panel .archive-actions .ghost-button {
+    min-height: 40px;
+    padding: 0 10px;
+    font-size: 0.82rem;
+  }
+
+  .archive-panel .archive-subhead strong {
+    font-size: 0.92rem;
+  }
+
+  .archive-panel .archive-subhead span {
+    max-width: 50%;
+    font-size: 0.66rem;
+  }
+
+  .archive-panel .table-row {
+    grid-template-columns: 48px 72px 140px 68px 78px 50px;
+    min-width: 520px;
+    font-size: 0.9rem;
+  }
+
+  .archive-panel .table-head {
+    font-size: 0.62rem;
   }
 
   .mega-value {
